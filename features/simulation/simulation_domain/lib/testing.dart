@@ -36,6 +36,10 @@ const _settleTime = Duration(milliseconds: 1000);
 const _rollTime = Duration(milliseconds: 500);
 const _rollTilt = 0.15;
 
+// Long enough for a marble launched two cells from a hole to reach its centre
+// once friction has turned the launch into rolling.
+const _holeApproachTime = Duration(milliseconds: 1500);
+
 Level _flatLevel() => const Level(
   id: 'contract-test',
   title: 'Contract Test',
@@ -63,6 +67,25 @@ Level _wallLevel() => const Level(
 /// The wall cell's world-space X coordinate in [_wallLevel], per
 /// [gridCellCenter]'s board-centering formula.
 const _wallX = 3.0;
+
+/// A level with a single hole two columns right of the start cell, on the
+/// same row so the marble can be rolled straight into it.
+Level _holeLevel() => const Level(
+  id: 'contract-test-hole',
+  title: 'Contract Test Hole',
+  width: 9,
+  height: 9,
+  start: GridPoint(column: 4, row: 4),
+  exit: GridPoint(column: 8, row: 8),
+  holes: [_hole],
+  walls: [],
+);
+
+const _hole = GridPoint(column: 6, row: 4);
+
+/// The hole cell's world-space X coordinate in [_holeLevel], per
+/// [gridCellCenter]'s board-centering formula.
+const _holeX = 2.0;
 
 void _stepFor(IMarbleSimulation simulation, Tilt tilt, Duration duration) {
   var remaining = duration;
@@ -153,6 +176,96 @@ void runMarbleSimulationContractTests(
             remaining -= step;
           }
         },
+      );
+    });
+
+    group('holes', () {
+      setUp(() {
+        harness.simulation.load(_holeLevel());
+        _stepFor(harness.simulation, Tilt.flat, _settleTime);
+      });
+
+      test('entering a hole emits FellInHole with that hole', () async {
+        final events = <SimulationEvent>[];
+        final subscription = harness.simulation.events.listen(events.add);
+        final restY = harness.simulation.marble.position.y;
+        harness.handle.placeMarble(Vector3(_holeX - 2, restY, 0));
+        harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+
+        _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
+        await pumpEventQueue();
+
+        expect(
+          events,
+          contains(isA<FellInHole>().having((e) => e.hole, 'hole', _hole)),
+        );
+        expect(harness.simulation.marble.isActive, isFalse);
+        await subscription.cancel();
+      });
+
+      test(
+        'a marble resting at the edge of a hole cell does not fall in',
+        () async {
+          final events = <SimulationEvent>[];
+          final subscription = harness.simulation.events.listen(events.add);
+          final restY = harness.simulation.marble.position.y;
+          harness.handle.placeMarble(Vector3(_holeX - 0.5, restY, 0));
+
+          _stepFor(harness.simulation, Tilt.flat, _settleTime);
+          await pumpEventQueue();
+
+          expect(events, isNot(contains(isA<FellInHole>())));
+          expect(harness.simulation.marble.isActive, isTrue);
+          await subscription.cancel();
+        },
+      );
+
+      test(
+        'respawn() returns the marble to the start and makes it active',
+        () async {
+          final restY = harness.simulation.marble.position.y;
+          harness.handle.placeMarble(Vector3(_holeX - 2, restY, 0));
+          harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+          _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
+          await pumpEventQueue();
+          expect(harness.simulation.marble.isActive, isFalse);
+
+          harness.simulation.respawn();
+
+          expect(harness.simulation.marble.isActive, isTrue);
+          expect(harness.simulation.marble.position.x, closeTo(0, 0.01));
+          expect(harness.simulation.marble.position.z, closeTo(0, 0.01));
+
+          // The respawned marble is dynamic again: tilting should move it.
+          final startX = harness.simulation.marble.position.x;
+          _stepFor(harness.simulation, Tilt(x: _rollTilt, y: 0), _rollTime);
+          expect(harness.simulation.marble.position.x, greaterThan(startX));
+        },
+      );
+    });
+
+    test('a marble outside the board emits LeftBoard', () async {
+      final events = <SimulationEvent>[];
+      final subscription = harness.simulation.events.listen(events.add);
+      final restY = harness.simulation.marble.position.y;
+      harness.handle.placeMarble(Vector3(50, restY, 0));
+
+      _stepFor(harness.simulation, Tilt.flat, _frame);
+      await pumpEventQueue();
+
+      expect(events, contains(isA<LeftBoard>()));
+      expect(harness.simulation.marble.isActive, isFalse);
+      await subscription.cancel();
+    });
+
+    test('marble speed never exceeds the maximum', () {
+      harness.handle.setMarbleVelocity(Vector3(harness.maxSpeed * 3, 0, 0));
+
+      harness.simulation.step(Tilt.flat, _frame);
+
+      expect(
+        harness.simulation.marble.velocity.length,
+        lessThanOrEqualTo(harness.maxSpeed + 1e-3),
       );
     });
   });

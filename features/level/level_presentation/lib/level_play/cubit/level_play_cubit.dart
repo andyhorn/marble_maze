@@ -21,4 +21,20 @@ class LevelPlayCubit extends Cubit<LevelPlayState> {
       emit(const LevelPlayError());
     }
   }
+
+  /// Moves from [LevelPlayPlaying] to [LevelPlayFalling]. Ignored in any
+  /// other state.
+  void marbleFell() {
+    final current = state;
+    if (current is! LevelPlayPlaying) return;
+    emit(LevelPlayFalling(current.level));
+  }
+
+  /// Moves from [LevelPlayFalling] back to [LevelPlayPlaying]. Ignored in
+  /// any other state.
+  void marbleRespawned() {
+    final current = state;
+    if (current is! LevelPlayFalling) return;
+    emit(LevelPlayPlaying(current.level));
+  }
 }

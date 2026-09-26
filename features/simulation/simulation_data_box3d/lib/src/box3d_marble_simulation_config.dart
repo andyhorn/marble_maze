@@ -9,6 +9,8 @@ class Box3dMarbleSimulationConfig {
     this.wallHeight = kWallHeight,
     this.wallThickness = 0.2,
     this.floorThickness = 0.5,
+    this.holeTriggerRadius = kHoleRadius,
+    this.exitTriggerRadius = kExitRadius,
     this.linearDamping = 0.3,
     this.angularDamping = 0.05,
     this.fixedTimestepSeconds = 1 / 120,
@@ -35,6 +37,12 @@ class Box3dMarbleSimulationConfig {
   /// The thickness of the floor collider.
   final double floorThickness;
 
+  /// How close the marble's centre must come to a hole's centre to fall in.
+  final double holeTriggerRadius;
+
+  /// How close the marble's centre must come to the exit's centre to finish.
+  final double exitTriggerRadius;
+
   /// Linear damping applied to the marble, approximating rolling
   /// resistance.
   final double linearDamping;
@@ -49,8 +57,7 @@ class Box3dMarbleSimulationConfig {
   /// resume after a stall does not dump a burst of steps.
   final Duration maxStepElapsed;
 
-  /// The marble's maximum speed, in units per second. Speed clamping
-  /// itself is added with physics tuning; this exposes the configured
-  /// value for the contract suite.
+  /// The marble's maximum speed, in units per second. Clamped every fixed
+  /// step.
   final double maxSpeed;
 }

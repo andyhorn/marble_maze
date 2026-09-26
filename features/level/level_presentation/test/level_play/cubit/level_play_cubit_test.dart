@@ -43,5 +43,35 @@ void main() {
       act: (cubit) => cubit.load('missing'),
       expect: () => [const LevelPlayLoading(), const LevelPlayError()],
     );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'moves from playing to falling and back to playing',
+      seed: () => const LevelPlayPlaying(level),
+      build: () => LevelPlayCubit(repository: repository),
+      act: (cubit) {
+        cubit
+          ..marbleFell()
+          ..marbleRespawned();
+      },
+      expect: () => [
+        const LevelPlayFalling(level),
+        const LevelPlayPlaying(level),
+      ],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'marbleFell() is ignored outside playing',
+      build: () => LevelPlayCubit(repository: repository),
+      act: (cubit) => cubit.marbleFell(),
+      expect: () => <LevelPlayState>[],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'marbleRespawned() is ignored outside falling',
+      seed: () => const LevelPlayPlaying(level),
+      build: () => LevelPlayCubit(repository: repository),
+      act: (cubit) => cubit.marbleRespawned(),
+      expect: () => <LevelPlayState>[],
+    );
   });
 }

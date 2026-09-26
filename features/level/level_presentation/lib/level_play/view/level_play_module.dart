@@ -80,10 +80,18 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
     return BlocBuilder<LevelPlayCubit, LevelPlayState>(
       builder: (context, state) => switch (state) {
         LevelPlayLoading() => const LevelPlayLoadingView(),
-        LevelPlayPlaying() => LevelPlayView(
+        // Falling renders the same subtree as Playing (the board stays up
+        // while the marble sinks), so both branches build a BoardSceneView
+        // rather than swapping widget types, which would recreate its
+        // state mid-fall.
+        LevelPlayPlaying(:final level) ||
+        LevelPlayFalling(:final level) => LevelPlayView(
           boardView: BoardSceneView(
-            level: state.level,
+            level: level,
             simulation: _simulationForPlay,
+            onMarbleFell: () => context.read<LevelPlayCubit>().marbleFell(),
+            onMarbleRespawned: () =>
+                context.read<LevelPlayCubit>().marbleRespawned(),
           ),
         ),
         LevelPlayError() => LevelPlayErrorView(

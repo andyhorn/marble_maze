@@ -8,6 +8,13 @@ import 'package:simulation_domain/simulation_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 import 'package:vector_math/vector_math.dart';
 
+/// Extra room, in world units, allowed beyond the board's edges before the
+/// safety net treats the marble as having left it. Wider than the outer
+/// border wall's own thickness, so only a marble that actually clipped
+/// through it trips this check.
+const _boundsMargin = 1.0;
+const _minSensorRadius = 0.01;
+
 /// A [IMarbleSimulation] backed by the box3d physics engine.
 ///
 /// Gravity tilts, not the board: [step] points `world.gravity` at the
@@ -23,8 +30,17 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
 
   Box3dWorld? _world;
   Box3dBody? _marbleBody;
+  int? _marbleShapeHandle;
   Level? _level;
   Duration _accumulated = Duration.zero;
+
+  /// Whether the marble is frozen after falling in a hole or leaving the
+  /// board. Cleared by [respawn].
+  bool _frozen = false;
+
+  /// Maps a hole sensor shape's handle to the [GridPoint] it triggers for.
+  final _holeSensors = <int, GridPoint>{};
+
   final _eventsController = StreamController<SimulationEvent>.broadcast();
 
   @override
@@ -32,6 +48,8 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _world?.dispose();
     _level = level;
     _accumulated = Duration.zero;
+    _frozen = false;
+    _holeSensors.clear();
 
     final world = Box3dWorld(gravity: Vector3(0, -config.gravityMagnitude, 0));
     _world = world;
@@ -41,6 +59,10 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       _buildWallRun(world, level, wall);
     }
     _buildBorder(world, level);
+    for (final hole in level.holes) {
+      _buildHoleSensor(world, level, hole);
+    }
+    _buildExitSensor(world, level);
 
     final start = gridPointCenter(
       level.start,
@@ -48,13 +70,51 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       height: level.height,
     )..y = config.marbleRadius;
     final marble = world.createBody(position: start)
-      ..addSphere(config.marbleRadius)
       ..isBullet = true
       ..linearDamping = config.linearDamping
       ..angularDamping = config.angularDamping
       ..sleepEnabled = false;
+    final marbleShape = marble.addSphere(config.marbleRadius)
+      ..sensorEventsEnabled = true;
     _marbleBody = marble;
+    _marbleShapeHandle = marbleShape.handle;
   }
+
+  void _buildHoleSensor(Box3dWorld world, Level level, GridPoint hole) {
+    final center = gridPointCenter(
+      hole,
+      width: level.width,
+      height: level.height,
+    )..y = config.marbleRadius;
+    final sensor =
+        world
+            .createBody(type: Box3dBodyType.static_, position: center)
+            .addSphere(
+              _sensorRadiusFor(config.holeTriggerRadius),
+              isSensor: true,
+            )
+          ..sensorEventsEnabled = true;
+    _holeSensors[sensor.handle] = hole;
+  }
+
+  // The exit sensor's shape exists so it can be collided against, but does
+  // not enable sensor events: nothing consumes exit overlaps yet.
+  void _buildExitSensor(Box3dWorld world, Level level) {
+    final center = gridPointCenter(
+      level.exit,
+      width: level.width,
+      height: level.height,
+    )..y = config.marbleRadius;
+    world
+        .createBody(type: Box3dBodyType.static_, position: center)
+        .addSphere(_sensorRadiusFor(config.exitTriggerRadius), isSensor: true);
+  }
+
+  // box3d reports a sensor overlap as soon as the marble's sphere touches the
+  // sensor, but a trigger radius is measured to the marble's centre. Shrinking
+  // the sensor by the marble radius makes the two agree.
+  double _sensorRadiusFor(double triggerRadius) =>
+      math.max(triggerRadius - config.marbleRadius, _minSensorRadius);
 
   void _buildFloor(Box3dWorld world, Level level) {
     final halfExtents = Vector3(
@@ -131,7 +191,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
         ? config.maxStepElapsed
         : elapsed;
     world.gravity = _gravityFor(tilt);
-    marble.wakeUp();
+    if (!_frozen) marble.wakeUp();
 
     _accumulated += clamped;
     final timestep = Duration(
@@ -142,7 +202,66 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     while (_accumulated >= timestep) {
       world.step(config.fixedTimestepSeconds);
       _accumulated -= timestep;
+
+      // Drained every fixed step regardless of freeze state, since box3d
+      // replaces the event buffers on the next step; while frozen the
+      // drained events are simply discarded below.
+      final stepEvents = world.drainEvents();
+      if (_frozen) continue;
+
+      _handleSensorEvents(stepEvents, marble);
+      if (_frozen) continue;
+
+      _checkBounds(marble);
+      if (_frozen) continue;
+
+      _clampSpeed(marble);
     }
+  }
+
+  void _handleSensorEvents(Box3dEvents stepEvents, Box3dBody marble) {
+    final marbleShape = _marbleShapeHandle;
+    if (marbleShape == null) return;
+    for (final began in stepEvents.sensorBegan) {
+      if (began.visitorShape != marbleShape) continue;
+      final hole = _holeSensors[began.sensorShape];
+      if (hole == null) continue;
+      _freeze(marble);
+      _eventsController.add(FellInHole(hole));
+      return;
+    }
+  }
+
+  void _checkBounds(Box3dBody marble) {
+    final level = _level;
+    if (level == null) return;
+    final position = marble.position;
+    final halfWidth = level.width / 2;
+    final halfHeight = level.height / 2;
+    final outOfBounds =
+        position.x.abs() > halfWidth + _boundsMargin ||
+        position.z.abs() > halfHeight + _boundsMargin ||
+        position.y < -config.floorThickness;
+    final nonFinite =
+        !position.x.isFinite || !position.y.isFinite || !position.z.isFinite;
+    if (!outOfBounds && !nonFinite) return;
+    _freeze(marble);
+    _eventsController.add(const LeftBoard());
+  }
+
+  void _clampSpeed(Box3dBody marble) {
+    final velocity = marble.linearVelocity;
+    final speed = velocity.length;
+    if (speed <= config.maxSpeed) return;
+    marble.linearVelocity = velocity..scale(config.maxSpeed / speed);
+  }
+
+  void _freeze(Box3dBody marble) {
+    marble
+      ..type = Box3dBodyType.kinematic
+      ..linearVelocity = Vector3.zero()
+      ..angularVelocity = Vector3.zero();
+    _frozen = true;
   }
 
   Vector3 _gravityFor(Tilt tilt) {
@@ -165,10 +284,12 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       height: level.height,
     )..y = config.marbleRadius;
     marble
+      ..type = Box3dBodyType.dynamic_
       ..setTransform(start)
       ..linearVelocity = Vector3.zero()
       ..angularVelocity = Vector3.zero()
       ..wakeUp();
+    _frozen = false;
   }
 
   @override
@@ -186,7 +307,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       position: body.position,
       rotation: body.rotation,
       velocity: body.linearVelocity,
-      isActive: true,
+      isActive: !_frozen,
     );
   }
 
@@ -198,6 +319,8 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _world?.dispose();
     _world = null;
     _marbleBody = null;
+    _marbleShapeHandle = null;
+    _holeSensors.clear();
     unawaited(_eventsController.close());
   }
 
