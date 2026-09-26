@@ -10,8 +10,19 @@ import 'package:marble_maze_app/app/routes/app_routes.dart';
 import 'package:marble_maze_app/app/view/home_page.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:tilt_domain/tilt_domain.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
+
+/// Reports no accelerometer, so these tests exercise the touch-only
+/// fallback without waiting on the real 500 ms probe window.
+class _FakeTiltRepository implements ITiltRepository {
+  @override
+  Future<bool> isAvailable() async => false;
+
+  @override
+  Stream<RawGravity> watchGravity() => const Stream.empty();
+}
 
 void main() {
   group('App', () {
@@ -24,7 +35,10 @@ void main() {
     Widget buildSubject() {
       return RepositoryProvider<ILevelsRepository>.value(
         value: repository,
-        child: App(router: GoRouter(routes: $appRoutes)),
+        child: RepositoryProvider<ITiltRepository>.value(
+          value: _FakeTiltRepository(),
+          child: App(router: GoRouter(routes: $appRoutes)),
+        ),
       );
     }
 

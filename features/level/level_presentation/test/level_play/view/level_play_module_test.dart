@@ -14,6 +14,16 @@ import '../../helpers/pump_app.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
 
+/// Reports no accelerometer, so tests exercise the touch-only fallback
+/// without waiting on the real 500 ms probe window.
+class _FakeTiltRepository implements ITiltRepository {
+  @override
+  Future<bool> isAvailable() async => false;
+
+  @override
+  Stream<RawGravity> watchGravity() => const Stream.empty();
+}
+
 class _FakeMarbleSimulation implements IMarbleSimulation {
   @override
   void load(Level level) {}
@@ -43,6 +53,7 @@ Widget _placeholderBoardBuilder({
   required Level level,
   required IMarbleSimulation simulation,
   required bool isSimulationActive,
+  required LevelPlayInputController controller,
   required VoidCallback onMarbleFell,
   required VoidCallback onMarbleRespawned,
   required VoidCallback onReachedExit,
@@ -59,11 +70,14 @@ void main() {
     Widget buildSubject() {
       return RepositoryProvider<ILevelsRepository>.value(
         value: repository,
-        child: LevelPlayModule(
-          levelId: 'first_roll',
-          simulationFactory: _FakeMarbleSimulation.new,
-          onExitToLevels: () {},
-          boardBuilder: _placeholderBoardBuilder,
+        child: RepositoryProvider<ITiltRepository>.value(
+          value: _FakeTiltRepository(),
+          child: LevelPlayModule(
+            levelId: 'first_roll',
+            simulationFactory: _FakeMarbleSimulation.new,
+            onExitToLevels: () {},
+            boardBuilder: _placeholderBoardBuilder,
+          ),
         ),
       );
     }

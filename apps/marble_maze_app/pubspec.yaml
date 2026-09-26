@@ -29,6 +29,10 @@ dependencies:
   material_ui: ^1.1.1
   simulation_data_box3d:
     path: ../../features/simulation/simulation_data_box3d
+  tilt_data_sensors_plus:
+    path: ../../features/tilt/tilt_data_sensors_plus
+  tilt_domain:
+    path: ../../features/tilt/tilt_domain
   ui_kit:
     path: ../../shared/ui_kit
 

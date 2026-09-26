@@ -35,4 +35,7 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get homePlayFirstRoll => 'Jugar Primera Vuelta';
+
+  @override
+  String get levelPlayDragToTiltHint => 'Arrastra para inclinar';
 }

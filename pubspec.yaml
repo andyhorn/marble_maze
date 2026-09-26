@@ -11,6 +11,7 @@ workspace:
   - features/level/level_presentation
   - features/simulation/simulation_domain
   - features/simulation/simulation_data_box3d
+  - features/tilt/tilt_data_sensors_plus
   - features/tilt/tilt_domain
   - shared/localizations
   - shared/ui_kit

@@ -37,5 +37,9 @@
     "homePlayFirstRoll": "Jugar Primera Vuelta",
     "@homePlayFirstRoll": {
         "description": "Botón temporal de la página de inicio que abre el nivel de muestra"
+    },
+    "levelPlayDragToTiltHint": "Arrastra para inclinar",
+    "@levelPlayDragToTiltHint": {
+        "description": "Sugerencia única que se muestra cuando el acelerómetro no está disponible, para que el jugador sepa que debe arrastrar el tablero"
     }
 }

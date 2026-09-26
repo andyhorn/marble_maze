@@ -37,5 +37,9 @@
     "homePlayFirstRoll": "Play First Roll",
     "@homePlayFirstRoll": {
         "description": "Temporary home page button that opens the sample level"
+    },
+    "levelPlayDragToTiltHint": "Drag to tilt",
+    "@levelPlayDragToTiltHint": {
+        "description": "One-time hint shown when the accelerometer is unavailable, so the player knows to drag the board instead"
     }
 }

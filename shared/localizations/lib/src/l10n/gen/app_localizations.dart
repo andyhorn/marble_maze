@@ -138,6 +138,12 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Play First Roll'**
   String get homePlayFirstRoll;
+
+  /// One-time hint shown when the accelerometer is unavailable, so the player knows to drag the board instead
+  ///
+  /// In en, this message translates to:
+  /// **'Drag to tilt'**
+  String get levelPlayDragToTiltHint;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

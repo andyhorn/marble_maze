@@ -4,15 +4,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/cubit/level_play_cubit.dart';
 import 'package:level_presentation/level_play/cubit/level_play_state.dart';
+import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
 import 'package:level_presentation/level_play/view/board_scene_view.dart';
 import 'package:level_presentation/level_play/view/level_play_error_view.dart';
-import 'package:level_presentation/level_play/view/level_play_hud.dart';
 import 'package:level_presentation/level_play/view/level_play_loading_view.dart';
+import 'package:level_presentation/level_play/view/level_play_playing_overlay.dart';
 import 'package:level_presentation/level_play/view/level_play_ready_overlay.dart';
 import 'package:level_presentation/level_play/view/level_play_view.dart';
 import 'package:level_presentation/level_play/view/level_play_won_overlay.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:simulation_domain/simulation_domain.dart';
+import 'package:tilt_domain/tilt_domain.dart';
 
 /// Builds the widget that renders the board and marble, in place of
 /// [BoardSceneView] for widget tests, since Flutter GPU does not render in
@@ -21,6 +23,7 @@ typedef BoardBuilder = Widget Function({
   required Level level,
   required IMarbleSimulation simulation,
   required bool isSimulationActive,
+  required LevelPlayInputController controller,
   required VoidCallback onMarbleFell,
   required VoidCallback onMarbleRespawned,
   required VoidCallback onReachedExit,
@@ -93,14 +96,30 @@ class _LevelPlayModuleBody extends StatefulWidget {
 
 class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   IMarbleSimulation? _simulation;
+  late final LevelPlayInputController _controller;
 
   IMarbleSimulation get _simulationForPlay =>
       _simulation ??= widget.simulationFactory();
 
   @override
+  void initState() {
+    super.initState();
+    _controller = LevelPlayInputController(
+      repository: context.read<ITiltRepository>(),
+    );
+    unawaited(_controller.initialize());
+  }
+
+  @override
   void dispose() {
     _simulation?.dispose();
+    _controller.dispose();
     super.dispose();
+  }
+
+  void _onStart(LevelPlayCubit cubit) {
+    _controller.calibrate();
+    cubit.start();
   }
 
   @override
@@ -114,11 +133,12 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             level: level,
             simulation: _simulationForPlay,
             isSimulationActive: false,
+            controller: _controller,
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,
           ),
-          overlay: LevelPlayReadyOverlay(onStart: cubit.start),
+          overlay: LevelPlayReadyOverlay(onStart: () => _onStart(cubit)),
         ),
         // Falling renders the same subtree as Playing (the board stays up
         // while the marble sinks), so both branches build a BoardSceneView
@@ -130,17 +150,23 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             level: level,
             simulation: _simulationForPlay,
             isSimulationActive: true,
+            controller: _controller,
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,
           ),
-          overlay: LevelPlayHud(cubit: cubit, title: level.title),
+          overlay: LevelPlayPlayingOverlay(
+            cubit: cubit,
+            title: level.title,
+            controller: _controller,
+          ),
         ),
         LevelPlayWon(:final level, :final time, :final par) => LevelPlayView(
           boardView: widget.boardBuilder(
             level: level,
             simulation: _simulationForPlay,
             isSimulationActive: false,
+            controller: _controller,
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,

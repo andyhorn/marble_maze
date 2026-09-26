@@ -23,6 +23,9 @@ class TouchTiltMapper {
   /// The current tilt.
   Tilt get tilt => _tilt;
 
+  /// Whether a finger is currently down.
+  bool get isDragging => _dragging;
+
   /// Records the touch-down position, in logical pixels.
   void dragStart(double dx, double dy) {
     _dragging = true;
