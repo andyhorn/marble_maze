@@ -10,6 +10,8 @@ import 'package:simulation_domain/simulation_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 import 'package:vector_math/vector_math.dart';
 
+import '../../helpers/pump_app.dart';
+
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
 
 class _FakeMarbleSimulation implements IMarbleSimulation {
@@ -37,6 +39,15 @@ class _FakeMarbleSimulation implements IMarbleSimulation {
   void dispose() {}
 }
 
+Widget _placeholderBoardBuilder({
+  required Level level,
+  required IMarbleSimulation simulation,
+  required bool isSimulationActive,
+  required VoidCallback onMarbleFell,
+  required VoidCallback onMarbleRespawned,
+  required VoidCallback onReachedExit,
+}) => const Placeholder();
+
 void main() {
   group('LevelPlayModule', () {
     late _MockLevelsRepository repository;
@@ -48,12 +59,11 @@ void main() {
     Widget buildSubject() {
       return RepositoryProvider<ILevelsRepository>.value(
         value: repository,
-        child: MaterialApp(
-          home: LevelPlayModule(
-            levelId: 'first_roll',
-            simulationFactory: _FakeMarbleSimulation.new,
-            onExitToLevels: () {},
-          ),
+        child: LevelPlayModule(
+          levelId: 'first_roll',
+          simulationFactory: _FakeMarbleSimulation.new,
+          onExitToLevels: () {},
+          boardBuilder: _placeholderBoardBuilder,
         ),
       );
     }
@@ -64,16 +74,37 @@ void main() {
       when(() => repository.getLevel('first_roll'))
           .thenAnswer((_) => Completer<Level>().future);
 
-      await tester.pumpWidget(buildSubject());
+      await tester.pumpApp(buildSubject());
 
       expect(find.byType(LevelPlayLoadingView), findsOneWidget);
+    });
+
+    testWidgets('shows the ready overlay once the level loads', (tester) async {
+      when(() => repository.getLevel('first_roll')).thenAnswer(
+        (_) async => const Level(
+          id: 'first_roll',
+          title: 'First Roll',
+          width: 3,
+          height: 3,
+          start: GridPoint(column: 0, row: 0),
+          exit: GridPoint(column: 2, row: 2),
+          holes: [],
+          walls: [],
+        ),
+      );
+
+      await tester.pumpApp(buildSubject());
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LevelPlayReadyOverlay), findsOneWidget);
+      expect(find.byType(Placeholder), findsOneWidget);
     });
 
     testWidgets('shows an error view for an unknown level', (tester) async {
       when(() => repository.getLevel('first_roll'))
           .thenThrow(const LevelNotFoundException('first_roll'));
 
-      await tester.pumpWidget(buildSubject());
+      await tester.pumpApp(buildSubject());
       await tester.pumpAndSettle();
 
       expect(find.byType(LevelPlayErrorView), findsOneWidget);

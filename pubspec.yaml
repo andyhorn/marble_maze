@@ -12,6 +12,8 @@ workspace:
   - features/simulation/simulation_domain
   - features/simulation/simulation_data_box3d
   - features/tilt/tilt_domain
+  - shared/localizations
+  - shared/ui_kit
 
 dev_dependencies:
   melos: ^8.9.0

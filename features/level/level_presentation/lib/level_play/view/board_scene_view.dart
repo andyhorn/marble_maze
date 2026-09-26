@@ -25,15 +25,17 @@ const _sinkAnimation = MarbleSinkAnimation();
 /// animation on the marble, then calls `simulation.respawn()`. [onMarbleFell]
 /// and [onMarbleRespawned] notify the caller of those two moments so it can
 /// drive its own state (for example a bloc cubit) without this view knowing
-/// about it.
+/// about it. A [ReachedExit] event calls [onReachedExit].
 class BoardSceneView extends StatefulWidget {
   /// Creates a board scene view for [level], stepping [simulation] each
-  /// frame.
+  /// frame while [isSimulationActive] is true.
   const new({
     required this.level,
     required this.simulation,
+    required this.isSimulationActive,
     required this.onMarbleFell,
     required this.onMarbleRespawned,
+    required this.onReachedExit,
     super.key,
   });
 
@@ -43,6 +45,10 @@ class BoardSceneView extends StatefulWidget {
   /// The marble simulation this view steps every frame.
   final IMarbleSimulation simulation;
 
+  /// Whether [simulation] advances each frame. False while the marble sits
+  /// still at the start (before the tap to start, and once it has won).
+  final bool isSimulationActive;
+
   /// Called when the marble falls into a hole or leaves the board, before
   /// the sink animation starts.
   final VoidCallback onMarbleFell;
@@ -50,6 +56,9 @@ class BoardSceneView extends StatefulWidget {
   /// Called once the sink animation completes and `simulation.respawn()`
   /// has been called.
   final VoidCallback onMarbleRespawned;
+
+  /// Called when the marble reaches the level's exit.
+  final VoidCallback onReachedExit;
 
   @override
   State<BoardSceneView> createState() => _BoardSceneViewState();
@@ -83,7 +92,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
       case FellInHole() || LeftBoard():
         _fallStartElapsed = _lastElapsed;
         widget.onMarbleFell();
-      case ReachedExit() || HitWall():
+      case ReachedExit():
+        widget.onReachedExit();
+      case HitWall():
         break;
     }
   }
@@ -145,6 +156,45 @@ class _BoardSceneViewState extends State<BoardSceneView>
             );
       _boardRoot.add(wallNode);
     }
+
+    for (final hole in level.holes) {
+      _boardRoot.add(
+        _buildFloorMarker(hole, radius: kHoleRadius, level: level),
+      );
+    }
+    _boardRoot.add(
+      _buildFloorMarker(
+        level.exit,
+        radius: kExitRadius,
+        level: level,
+        color: Colors.amber,
+      ),
+    );
+  }
+
+  static const _holeMarkerColor = Color(0xFF141414);
+
+  // A thin disc set into the floor: proper cups and materials come in #10,
+  // this is only so the player can see where holes and the exit are.
+  Node _buildFloorMarker(
+    GridPoint point, {
+    required double radius,
+    required Level level,
+    Color color = _holeMarkerColor,
+  }) {
+    final center = gridPointCenter(
+      point,
+      width: level.width,
+      height: level.height,
+    );
+    return Node(
+      mesh: Mesh(
+        CylinderGeometry(bottomRadius: radius, topRadius: radius, height: 0.02),
+        PhysicallyBasedMaterial()
+          ..baseColorFactor = vm.Vector4(color.r, color.g, color.b, color.a)
+          ..roughnessFactor = 0.9,
+      ),
+    )..position = vm.Vector3(center.x, 0.01, center.z);
   }
 
   void _onTick(Duration elapsed) {
@@ -154,9 +204,13 @@ class _BoardSceneViewState extends State<BoardSceneView>
     _tiltMapper.update(delta);
     final tilt = _tiltMapper.tilt;
 
-    // Stepped unconditionally, even while falling: the marble is frozen at
-    // that point, so stepping it is harmless.
-    widget.simulation.step(tilt, delta);
+    // Stepped unconditionally while falling: the marble is frozen at that
+    // point, so stepping it is harmless. Not stepped while
+    // [BoardSceneView.isSimulationActive] is false (Ready and Won): the
+    // marble sits still at rest rather than settling under gravity.
+    if (widget.isSimulationActive || _isFalling) {
+      widget.simulation.step(tilt, delta);
+    }
 
     _boardRoot.rotation =
         vm.Quaternion.axisAngle(vm.Vector3(0, 0, 1), -tilt.x) *

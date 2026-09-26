@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:level_presentation/level_presentation.dart';
-import 'package:material_ui/material_ui.dart';
+
+import '../../helpers/pump_app.dart';
 
 void main() {
   group('LevelPlayErrorView', () {
@@ -8,10 +9,8 @@ void main() {
       tester,
     ) async {
       var tapped = false;
-      await tester.pumpWidget(
-        MaterialApp(
-          home: LevelPlayErrorView(onBackToLevels: () => tapped = true),
-        ),
+      await tester.pumpApp(
+        LevelPlayErrorView(onBackToLevels: () => tapped = true),
       );
 
       await tester.tap(find.text('Back to levels'));

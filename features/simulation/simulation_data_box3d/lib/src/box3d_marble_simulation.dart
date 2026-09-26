@@ -41,6 +41,9 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
   /// Maps a hole sensor shape's handle to the [GridPoint] it triggers for.
   final _holeSensors = <int, GridPoint>{};
 
+  /// The exit sensor shape's handle, once loaded.
+  int? _exitSensorHandle;
+
   final _eventsController = StreamController<SimulationEvent>.broadcast();
 
   @override
@@ -50,6 +53,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _accumulated = Duration.zero;
     _frozen = false;
     _holeSensors.clear();
+    _exitSensorHandle = null;
 
     final world = Box3dWorld(gravity: Vector3(0, -config.gravityMagnitude, 0));
     _world = world;
@@ -97,17 +101,21 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _holeSensors[sensor.handle] = hole;
   }
 
-  // The exit sensor's shape exists so it can be collided against, but does
-  // not enable sensor events: nothing consumes exit overlaps yet.
   void _buildExitSensor(Box3dWorld world, Level level) {
     final center = gridPointCenter(
       level.exit,
       width: level.width,
       height: level.height,
     )..y = config.marbleRadius;
-    world
-        .createBody(type: Box3dBodyType.static_, position: center)
-        .addSphere(_sensorRadiusFor(config.exitTriggerRadius), isSensor: true);
+    final sensor =
+        world
+            .createBody(type: Box3dBodyType.static_, position: center)
+            .addSphere(
+              _sensorRadiusFor(config.exitTriggerRadius),
+              isSensor: true,
+            )
+          ..sensorEventsEnabled = true;
+    _exitSensorHandle = sensor.handle;
   }
 
   // box3d reports a sensor overlap as soon as the marble's sphere touches the
@@ -224,6 +232,11 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     if (marbleShape == null) return;
     for (final began in stepEvents.sensorBegan) {
       if (began.visitorShape != marbleShape) continue;
+      if (began.sensorShape == _exitSensorHandle) {
+        _freeze(marble);
+        _eventsController.add(const ReachedExit());
+        return;
+      }
       final hole = _holeSensors[began.sensorShape];
       if (hole == null) continue;
       _freeze(marble);
@@ -321,6 +334,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _marbleBody = null;
     _marbleShapeHandle = null;
     _holeSensors.clear();
+    _exitSensorHandle = null;
     unawaited(_eventsController.close());
   }
 

@@ -1,7 +1,0 @@
-{
-    "@@locale": "en",
-    "appTitle": "Marble Maze",
-    "@appTitle": {
-        "description": "The name of the app"
-    }
-}

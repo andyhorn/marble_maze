@@ -1,0 +1,41 @@
+{
+    "@@locale": "en",
+    "appTitle": "Marble Maze",
+    "@appTitle": {
+        "description": "The name of the app"
+    },
+    "levelPlayTapToStart": "Tap to start",
+    "@levelPlayTapToStart": {
+        "description": "Shown over the board before the player starts a level"
+    },
+    "levelPlayErrorMessage": "This level could not be loaded.",
+    "@levelPlayErrorMessage": {
+        "description": "Shown when a level fails to load"
+    },
+    "backToLevels": "Back to levels",
+    "@backToLevels": {
+        "description": "Button that returns to level select"
+    },
+    "levelPlayWonTimeLabel": "Time: {time}",
+    "@levelPlayWonTimeLabel": {
+        "description": "The player's finishing time on the win overlay",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelPlayWonParLabel": "Par: {time}",
+    "@levelPlayWonParLabel": {
+        "description": "The level's par time on the win overlay",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "homePlayFirstRoll": "Play First Roll",
+    "@homePlayFirstRoll": {
+        "description": "Temporary home page button that opens the sample level"
+    }
+}

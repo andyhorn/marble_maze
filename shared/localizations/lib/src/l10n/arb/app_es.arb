@@ -1,0 +1,41 @@
+{
+    "@@locale": "es",
+    "appTitle": "Laberinto de canicas",
+    "@appTitle": {
+        "description": "El nombre de la aplicación"
+    },
+    "levelPlayTapToStart": "Toca para empezar",
+    "@levelPlayTapToStart": {
+        "description": "Se muestra sobre el tablero antes de que el jugador empiece un nivel"
+    },
+    "levelPlayErrorMessage": "No se pudo cargar este nivel.",
+    "@levelPlayErrorMessage": {
+        "description": "Se muestra cuando un nivel no se puede cargar"
+    },
+    "backToLevels": "Volver a los niveles",
+    "@backToLevels": {
+        "description": "Botón que vuelve a la selección de niveles"
+    },
+    "levelPlayWonTimeLabel": "Tiempo: {time}",
+    "@levelPlayWonTimeLabel": {
+        "description": "El tiempo final del jugador en la pantalla de victoria",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelPlayWonParLabel": "Par: {time}",
+    "@levelPlayWonParLabel": {
+        "description": "El tiempo par del nivel en la pantalla de victoria",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "homePlayFirstRoll": "Jugar Primera Vuelta",
+    "@homePlayFirstRoll": {
+        "description": "Botón temporal de la página de inicio que abre el nivel de muestra"
+    }
+}

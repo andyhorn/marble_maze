@@ -16,12 +16,16 @@ dependencies:
   flutter_scene: 0.23.0
   level_domain:
     path: ../level_domain
+  localizations:
+    path: ../../../shared/localizations
   material_ui: ^1.1.1
   meta: ^1.16.0
   simulation_domain:
     path: ../../simulation/simulation_domain
   tilt_domain:
     path: ../../tilt/tilt_domain
+  ui_kit:
+    path: ../../../shared/ui_kit
   vector_math: ^2.1.4
 
 dev_dependencies:

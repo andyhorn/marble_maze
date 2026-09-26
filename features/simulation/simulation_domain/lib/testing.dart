@@ -87,6 +87,23 @@ const _hole = GridPoint(column: 6, row: 4);
 /// [gridCellCenter]'s board-centering formula.
 const _holeX = 2.0;
 
+/// A level with the exit two columns right of the start cell, on the same
+/// row so the marble can be rolled straight into it.
+Level _exitLevel() => const Level(
+  id: 'contract-test-exit',
+  title: 'Contract Test Exit',
+  width: 9,
+  height: 9,
+  start: GridPoint(column: 4, row: 4),
+  exit: GridPoint(column: 6, row: 4),
+  holes: [],
+  walls: [],
+);
+
+/// The exit cell's world-space X coordinate in [_exitLevel], per
+/// [gridCellCenter]'s board-centering formula.
+const _exitX = 2.0;
+
 void _stepFor(IMarbleSimulation simulation, Tilt tilt, Duration duration) {
   var remaining = duration;
   while (remaining > Duration.zero) {
@@ -242,6 +259,28 @@ void runMarbleSimulationContractTests(
           expect(harness.simulation.marble.position.x, greaterThan(startX));
         },
       );
+    });
+
+    group('exit', () {
+      setUp(() {
+        harness.simulation.load(_exitLevel());
+        _stepFor(harness.simulation, Tilt.flat, _settleTime);
+      });
+
+      test('entering the exit emits ReachedExit', () async {
+        final events = <SimulationEvent>[];
+        final subscription = harness.simulation.events.listen(events.add);
+        final restY = harness.simulation.marble.position.y;
+        harness.handle.placeMarble(Vector3(_exitX - 2, restY, 0));
+        harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+
+        _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
+        await pumpEventQueue();
+
+        expect(events, contains(isA<ReachedExit>()));
+        expect(harness.simulation.marble.isActive, isFalse);
+        await subscription.cancel();
+      });
     });
 
     test('a marble outside the board emits LeftBoard', () async {

@@ -1,6 +1,7 @@
 import 'package:go_router/go_router.dart';
-import 'package:marble_maze_app/l10n/l10n.dart';
+import 'package:localizations/localizations.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:ui_kit/ui_kit.dart';
 
 /// The root widget of the app.
 class App extends StatelessWidget {
@@ -14,7 +15,7 @@ class App extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       onGenerateTitle: (context) => context.l10n.appTitle,
-      theme: ThemeData(useMaterial3: true),
+      theme: appTheme,
       localizationsDelegates: AppLocalizations.localizationsDelegates,
       supportedLocales: AppLocalizations.supportedLocales,
       routerConfig: router,

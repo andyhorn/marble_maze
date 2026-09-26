@@ -1,7 +1,0 @@
-{
-    "@@locale": "es",
-    "appTitle": "Laberinto de canicas",
-    "@appTitle": {
-        "description": "El nombre de la aplicación"
-    }
-}

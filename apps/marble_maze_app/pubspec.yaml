@@ -24,10 +24,13 @@ dependencies:
     path: ../../features/level/level_domain
   level_presentation:
     path: ../../features/level/level_presentation
+  localizations:
+    path: ../../shared/localizations
   material_ui: ^1.1.1
   simulation_data_box3d:
     path: ../../features/simulation/simulation_data_box3d
-
+  ui_kit:
+    path: ../../shared/ui_kit
 
 dev_dependencies:
   bloc_lint: ^0.4.2
@@ -41,5 +44,4 @@ dev_dependencies:
   very_good_analysis: ^11.0.0
 
 flutter:
-  generate: true
   uses-material-design: true
