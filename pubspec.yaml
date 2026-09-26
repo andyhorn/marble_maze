@@ -6,6 +6,7 @@ environment:
 
 workspace:
   - apps/marble_maze_app
+  - features/level/level_data
   - features/level/level_domain
   - features/level/level_presentation
   - features/simulation/simulation_domain

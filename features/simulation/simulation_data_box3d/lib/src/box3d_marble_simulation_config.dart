@@ -13,6 +13,7 @@ class Box3dMarbleSimulationConfig {
     this.angularDamping = 0.05,
     this.fixedTimestepSeconds = 1 / 120,
     this.maxStepElapsed = const Duration(milliseconds: 100),
+    this.maxSpeed = 12,
   });
 
   /// The default tuning.
@@ -47,4 +48,9 @@ class Box3dMarbleSimulationConfig {
   /// The maximum wall-clock time a single `step` call advances, so a
   /// resume after a stall does not dump a burst of steps.
   final Duration maxStepElapsed;
+
+  /// The marble's maximum speed, in units per second. Speed clamping
+  /// itself is added with physics tuning; this exposes the configured
+  /// value for the contract suite.
+  final double maxSpeed;
 }

@@ -16,7 +16,10 @@ dependencies:
   flutter_bloc: ^9.1.1
   flutter_localizations:
     sdk: flutter
+  go_router: ^18.0.1
   intl: ^0.20.2
+  level_data:
+    path: ../../features/level/level_data
   level_domain:
     path: ../../features/level/level_domain
   level_presentation:
@@ -30,8 +33,10 @@ dev_dependencies:
   bloc_lint: ^0.4.2
   bloc_test: ^10.0.0
   bloc_tools: ^0.1.0-dev.24
+  build_runner: ^2.16.1
   flutter_test:
     sdk: flutter
+  go_router_builder: ^4.5.0
   mocktail: ^1.0.5
   very_good_analysis: ^11.0.0
 

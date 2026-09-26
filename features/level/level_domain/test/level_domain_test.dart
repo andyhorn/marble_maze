@@ -52,4 +52,44 @@ void main() {
       );
     });
   });
+
+  group('LevelManifestEntry', () {
+    test('supports value equality', () {
+      expect(
+        const LevelManifestEntry(
+          id: 'a',
+          title: 'A',
+          par: Duration(seconds: 1),
+        ),
+        const LevelManifestEntry(
+          id: 'a',
+          title: 'A',
+          par: Duration(seconds: 1),
+        ),
+      );
+      expect(
+        const LevelManifestEntry(id: 'a', title: 'A'),
+        isNot(const LevelManifestEntry(id: 'b', title: 'A')),
+      );
+    });
+  });
+
+  group('LevelFormatException', () {
+    test('formats as file:line:column: reason', () {
+      const exception = LevelFormatException(
+        file: 'first_roll.txt',
+        line: 3,
+        column: 5,
+        reason: 'duplicate start cell',
+      );
+      expect(exception.toString(), 'first_roll.txt:3:5: duplicate start cell');
+    });
+  });
+
+  group('LevelNotFoundException', () {
+    test('carries the unknown id', () {
+      const exception = LevelNotFoundException('missing');
+      expect(exception.id, 'missing');
+    });
+  });
 }

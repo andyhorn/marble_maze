@@ -1,0 +1,21 @@
+name: level_data
+description: Reads level files and the levels manifest.
+version: 0.1.0+1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  level_domain:
+    path: ../level_domain
+  meta: ^1.16.0
+
+dev_dependencies:
+  test: ^1.31.0
+  very_good_analysis: ^11.0.0
+
+flutter:
+  assets:
+    - assets/levels/

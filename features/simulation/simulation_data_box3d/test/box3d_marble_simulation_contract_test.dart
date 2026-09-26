@@ -26,6 +26,7 @@ void main() {
     return MarbleSimulationHarness(
       simulation: simulation,
       handle: _Box3dTestHandle(simulation),
+      maxSpeed: simulation.config.maxSpeed,
     );
   });
 }
