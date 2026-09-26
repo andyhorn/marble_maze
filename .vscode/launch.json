@@ -1,0 +1,47 @@
+{
+    // Use IntelliSense to learn about possible attributes.
+    // Hover to view descriptions of existing attributes.
+    // For more information, visit: https://go.microsoft.com/fwlink/?linkid=830387
+    "version": "0.2.0",
+    "configurations": [
+        {
+            "name": "marble_maze_app.dev",
+            "cwd": "apps/marble_maze_app",
+            "program": "lib/main_development.dart",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--flavor",
+                "development"
+            ]
+        },
+        {
+            "name": "marble_maze_app.stg",
+            "cwd": "apps/marble_maze_app",
+            "program": "lib/main_staging.dart",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--flavor",
+                "staging"
+            ]
+        },
+        {
+            "name": "marble_maze_app.prod",
+            "cwd": "apps/marble_maze_app",
+            "program": "lib/main_production.dart",
+            "request": "launch",
+            "type": "dart",
+            "args": [
+                "--flavor",
+                "production"
+            ]
+        },
+        {
+            "name": "simulation_data_box3d",
+            "cwd": "features/simulation/simulation_data_box3d",
+            "request": "launch",
+            "type": "dart"
+        }
+    ]
+}

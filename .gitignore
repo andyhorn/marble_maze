@@ -1,7 +1,8 @@
 .dart_tool/
 build/
 .idea/
-.vscode/
+.vscode/*
+!.vscode/launch.json
 *.iml
 .DS_Store
 coverage/
