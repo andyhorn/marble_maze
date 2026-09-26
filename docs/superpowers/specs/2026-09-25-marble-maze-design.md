@@ -303,3 +303,12 @@ The timer is a `Stopwatch` owned by the Cubit, paused while `Paused`. HUD time i
 
 - Ragdoll cannon game; reconsider `flutter_scene_box3d` (node syncing, joint components) or Rapier (joint limits on ball joints).
 - Sound, settings screen, moving hazards, level editor.
+
+## Decisions made during implementation
+
+- **Level id** is the level file's name without its extension (for example `first_roll` for `first_roll.txt`).
+- **`levels.json`** lists only level ids, in order. Title and par come from each level file's header, which is the single source of truth; `getManifest()` builds `LevelManifestEntry` values by parsing each file.
+- **Contract suite test hook.** The `simulation_domain` `testing/` library takes a factory that returns the simulation plus a backend-supplied `MarbleTestHandle` for placing the marble and setting its velocity. `IMarbleSimulation` itself gets no test-only methods.
+- **Tilt sign convention.** Positive `Tilt.x` rolls the marble toward +X (screen right). Positive `Tilt.y` tilts the far edge down and rolls the marble toward −Z (screen up). Touch drag right gives positive `x`; drag up gives positive `y`.
+- **`level_domain` models arrive with #3**, so `IMarbleSimulation.load(Level)` has its final shape from the start. #3's arena is a hard-coded `Level`.
+- **HDR environment map:** a CC0 map from Poly Haven.
