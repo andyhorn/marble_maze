@@ -6,16 +6,17 @@ part of 'app_routes.dart';
 // GoRouterGenerator
 // **************************************************************************
 
-List<RouteBase> get $appRoutes => [$homeRoute, $levelPlayRoute];
+List<RouteBase> get $appRoutes => [$levelSelectRoute, $levelPlayRoute];
 
-RouteBase get $homeRoute => GoRouteData.$route(
+RouteBase get $levelSelectRoute => GoRouteData.$route(
   path: '/',
   hasOverriddenOnExit: false,
-  factory: $HomeRoute._fromState,
+  factory: $LevelSelectRoute._fromState,
 );
 
-mixin $HomeRoute on GoRouteData {
-  static HomeRoute _fromState(GoRouterState state) => const HomeRoute();
+mixin $LevelSelectRoute on GoRouteData {
+  static LevelSelectRoute _fromState(GoRouterState state) =>
+      const LevelSelectRoute();
 
   @override
   String get location => GoRouteData.$location('/');

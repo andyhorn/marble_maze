@@ -34,8 +34,58 @@
             }
         }
     },
-    "homePlayFirstRoll": "Play First Roll",
-    "@homePlayFirstRoll": {
-        "description": "Temporary home page button that opens the sample level"
+    "levelPlayWonBestLabel": "Best: {time}",
+    "@levelPlayWonBestLabel": {
+        "description": "The level's best saved time on the win overlay",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelPlayWonNewBestBadge": "New best!",
+    "@levelPlayWonNewBestBadge": {
+        "description": "Badge shown on the win overlay when this run set a new best time"
+    },
+    "levelPlayWonNext": "Next",
+    "@levelPlayWonNext": {
+        "description": "Button on the win overlay that opens the next level"
+    },
+    "levelPlayWonRetry": "Retry",
+    "@levelPlayWonRetry": {
+        "description": "Button on the win overlay that replays the same level"
+    },
+    "levelSelectTitle": "Levels",
+    "@levelSelectTitle": {
+        "description": "The level select screen's title"
+    },
+    "levelSelectErrorMessage": "Levels could not be loaded.",
+    "@levelSelectErrorMessage": {
+        "description": "Shown when the level manifest fails to load"
+    },
+    "levelSelectBestTimeLabel": "Best: {time}",
+    "@levelSelectBestTimeLabel": {
+        "description": "A level's best saved time in the level list",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelSelectNoBestTime": "No best time yet",
+    "@levelSelectNoBestTime": {
+        "description": "Shown in the level list when a level has no saved best time"
+    },
+    "levelSelectParBeaten": "Par beaten",
+    "@levelSelectParBeaten": {
+        "description": "Shown in the level list when the player's best time beats par"
+    },
+    "levelSelectParNotBeaten": "Par not beaten",
+    "@levelSelectParNotBeaten": {
+        "description": "Shown in the level list when the player has not yet beaten par"
+    },
+    "levelSelectParNone": "No par time",
+    "@levelSelectParNone": {
+        "description": "Shown in the level list when a level has no par time"
     }
 }

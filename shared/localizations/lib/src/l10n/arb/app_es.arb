@@ -34,8 +34,58 @@
             }
         }
     },
-    "homePlayFirstRoll": "Jugar Primera Vuelta",
-    "@homePlayFirstRoll": {
-        "description": "Botón temporal de la página de inicio que abre el nivel de muestra"
+    "levelPlayWonBestLabel": "Mejor: {time}",
+    "@levelPlayWonBestLabel": {
+        "description": "El mejor tiempo guardado del nivel en la pantalla de victoria",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelPlayWonNewBestBadge": "¡Nuevo mejor tiempo!",
+    "@levelPlayWonNewBestBadge": {
+        "description": "Insignia que se muestra cuando esta vuelta establece un nuevo mejor tiempo"
+    },
+    "levelPlayWonNext": "Siguiente",
+    "@levelPlayWonNext": {
+        "description": "Botón de la pantalla de victoria que abre el siguiente nivel"
+    },
+    "levelPlayWonRetry": "Reintentar",
+    "@levelPlayWonRetry": {
+        "description": "Botón de la pantalla de victoria que vuelve a jugar el mismo nivel"
+    },
+    "levelSelectTitle": "Niveles",
+    "@levelSelectTitle": {
+        "description": "El título de la pantalla de selección de niveles"
+    },
+    "levelSelectErrorMessage": "No se pudieron cargar los niveles.",
+    "@levelSelectErrorMessage": {
+        "description": "Se muestra cuando el manifiesto de niveles no se puede cargar"
+    },
+    "levelSelectBestTimeLabel": "Mejor: {time}",
+    "@levelSelectBestTimeLabel": {
+        "description": "El mejor tiempo guardado de un nivel en la lista de niveles",
+        "placeholders": {
+            "time": {
+                "type": "String"
+            }
+        }
+    },
+    "levelSelectNoBestTime": "Sin mejor tiempo aún",
+    "@levelSelectNoBestTime": {
+        "description": "Se muestra en la lista de niveles cuando un nivel no tiene mejor tiempo guardado"
+    },
+    "levelSelectParBeaten": "Par superado",
+    "@levelSelectParBeaten": {
+        "description": "Se muestra en la lista de niveles cuando el mejor tiempo del jugador supera el par"
+    },
+    "levelSelectParNotBeaten": "Par no superado",
+    "@levelSelectParNotBeaten": {
+        "description": "Se muestra en la lista de niveles cuando el jugador aún no ha superado el par"
+    },
+    "levelSelectParNone": "Sin tiempo par",
+    "@levelSelectParNone": {
+        "description": "Se muestra en la lista de niveles cuando un nivel no tiene tiempo par"
     }
 }

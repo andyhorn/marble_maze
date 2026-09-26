@@ -4,12 +4,16 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:level_data/level_data.dart';
 import 'package:level_domain/level_domain.dart';
+import 'package:level_presentation/level_presentation.dart';
 import 'package:marble_maze_app/app/routes/app_routes.dart';
 import 'package:marble_maze_app/app/view/app.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:progress_data_shared_preferences/progress_data_shared_preferences.dart';
+import 'package:progress_domain/progress_domain.dart';
 
-/// Builds the app: a [LevelsRepository] reading bundled level assets, and
-/// the typed [GoRouter] routes.
+/// Builds the app: a [LevelsRepository] reading bundled level assets, a
+/// [SharedPreferencesProgressRepository] for saved best times, and the
+/// typed [GoRouter] routes.
 ///
 /// Awaits [Box3d.ensureInitialized] first: constructing a
 /// `Box3dMarbleSimulation` requires the physics backend to already be
@@ -20,10 +24,17 @@ Future<Widget> buildApp() async {
   final levelsRepository = LevelsRepository(
     dataSource: AssetLevelDataSource(loader: rootBundle.loadString),
   );
-  final router = GoRouter(routes: $appRoutes);
+  final progressRepository = SharedPreferencesProgressRepository();
+  final router = GoRouter(
+    routes: $appRoutes,
+    observers: [levelSelectRouteObserver],
+  );
 
   return RepositoryProvider<ILevelsRepository>.value(
     value: levelsRepository,
-    child: App(router: router),
+    child: RepositoryProvider<IProgressRepository>.value(
+      value: progressRepository,
+      child: App(router: router),
+    ),
   );
 }

@@ -3,14 +3,18 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:progress_domain/progress_domain.dart';
 
 import '../../helpers/fake_stopwatch.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
 
+class _MockProgressRepository extends Mock implements IProgressRepository;
+
 void main() {
   group('LevelPlayCubit', () {
     late _MockLevelsRepository repository;
+    late _MockProgressRepository progressRepository;
     late FakeStopwatch stopwatch;
     const level = Level(
       id: 'first_roll',
@@ -23,14 +27,37 @@ void main() {
       holes: [],
       walls: [],
     );
+    const secondLevelEntry = LevelManifestEntry(
+      id: 'second_roll',
+      title: 'Second Roll',
+    );
+
+    setUpAll(() {
+      registerFallbackValue(Duration.zero);
+    });
 
     setUp(() {
       repository = _MockLevelsRepository();
+      progressRepository = _MockProgressRepository();
       stopwatch = FakeStopwatch();
+      when(() => repository.getManifest()).thenAnswer(
+        (_) async => [
+          const LevelManifestEntry(
+            id: 'first_roll',
+            title: 'First Roll',
+            par: Duration(seconds: 20),
+          ),
+          secondLevelEntry,
+        ],
+      );
+      when(() => progressRepository.getRecords()).thenAnswer((_) async => {});
+      when(() => progressRepository.submitTime(any(), any()))
+          .thenAnswer((_) async => true);
     });
 
     LevelPlayCubit build() => LevelPlayCubit(
       repository: repository,
+      progressRepository: progressRepository,
       stopwatchFactory: () => stopwatch,
     );
 
@@ -111,9 +138,82 @@ void main() {
       },
       expect: () => [
         const LevelPlayPlaying(level),
-        const LevelPlayWon(level, Duration(seconds: 12), Duration(seconds: 20)),
+        const LevelPlayWon(
+          level: level,
+          time: Duration(seconds: 12),
+          par: Duration(seconds: 20),
+          bestTime: Duration(seconds: 12),
+          isNewBest: true,
+          nextLevelId: null,
+        ),
       ],
       verify: (_) => expect(stopwatch.isRunning, isFalse),
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'marbleReachedExit() reports the saved best, a slower run, and the '
+      'next level, after load() has fetched them',
+      setUp: () {
+        when(() => repository.getLevel('first_roll'))
+            .thenAnswer((_) async => level);
+        when(() => progressRepository.getRecords()).thenAnswer(
+          (_) async => {
+            'first_roll': const LevelRecord(
+              levelId: 'first_roll',
+              bestTime: Duration(seconds: 10),
+            ),
+          },
+        );
+      },
+      build: build,
+      act: (cubit) async {
+        await cubit.load('first_roll');
+        cubit.start();
+        stopwatch.elapsed = const Duration(seconds: 12);
+        cubit.marbleReachedExit();
+      },
+      expect: () => [
+        const LevelPlayLoading(),
+        const LevelPlayReady(level),
+        const LevelPlayPlaying(level),
+        const LevelPlayWon(
+          level: level,
+          time: Duration(seconds: 12),
+          par: Duration(seconds: 20),
+          bestTime: Duration(seconds: 10),
+          isNewBest: false,
+          nextLevelId: 'second_roll',
+        ),
+      ],
+      verify: (_) => verify(
+        () => progressRepository.submitTime(
+          'first_roll',
+          const Duration(seconds: 12),
+        ),
+      ).called(1),
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'retry() moves from won back to ready',
+      seed: () => const LevelPlayWon(
+        level: level,
+        time: Duration(seconds: 12),
+        par: Duration(seconds: 20),
+        bestTime: Duration(seconds: 12),
+        isNewBest: true,
+        nextLevelId: null,
+      ),
+      build: build,
+      act: (cubit) => cubit.retry(),
+      expect: () => [const LevelPlayReady(level)],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'retry() is ignored outside won',
+      seed: () => const LevelPlayReady(level),
+      build: build,
+      act: (cubit) => cubit.retry(),
+      expect: () => <LevelPlayState>[],
     );
 
     blocTest<LevelPlayCubit, LevelPlayState>(

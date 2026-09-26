@@ -20,6 +20,8 @@ dependencies:
     path: ../../../shared/localizations
   material_ui: ^1.1.1
   meta: ^1.16.0
+  progress_domain:
+    path: ../../progress/progress_domain
   simulation_domain:
     path: ../../simulation/simulation_domain
   tilt_domain:

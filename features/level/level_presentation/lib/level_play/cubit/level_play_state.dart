@@ -67,10 +67,20 @@ class LevelPlayFalling extends LevelPlayState {
 }
 
 /// The marble reached the exit. The timer has stopped at [time]; [par] is
-/// the level's par time, if it has one.
+/// the level's par time, if it has one. [bestTime] is the best time saved
+/// for this level, including this run; [isNewBest] is whether this run set
+/// it. [nextLevelId] is the next level in the manifest, or null on the
+/// last level.
 class LevelPlayWon extends LevelPlayState {
   /// Creates a won state for [level], finished in [time].
-  const new(this.level, this.time, this.par);
+  const new({
+    required this.level,
+    required this.time,
+    required this.par,
+    required this.bestTime,
+    required this.isNewBest,
+    required this.nextLevelId,
+  });
 
   /// The loaded level.
   final Level level;
@@ -81,15 +91,28 @@ class LevelPlayWon extends LevelPlayState {
   /// The level's par time, if it has one.
   final Duration? par;
 
+  /// The best time saved for this level, including this run.
+  final Duration bestTime;
+
+  /// Whether this run set a new best time.
+  final bool isNewBest;
+
+  /// The next level's id in the manifest, or null if [level] is the last.
+  final String? nextLevelId;
+
   @override
   bool operator ==(Object other) =>
       other is LevelPlayWon &&
       other.level == level &&
       other.time == time &&
-      other.par == par;
+      other.par == par &&
+      other.bestTime == bestTime &&
+      other.isNewBest == isNewBest &&
+      other.nextLevelId == nextLevelId;
 
   @override
-  int get hashCode => Object.hash(level, time, par);
+  int get hashCode =>
+      Object.hash(level, time, par, bestTime, isNewBest, nextLevelId);
 }
 
 /// The level failed to load, for example an unknown level id.

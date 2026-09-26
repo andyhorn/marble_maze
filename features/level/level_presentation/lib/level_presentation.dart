@@ -1,4 +1,5 @@
-/// The level play screen -- the frame loop, board, and marble.
+/// The level select and level play screens.
 library;
 
 export 'level_play/level_play.dart';
+export 'level_select/level_select.dart';

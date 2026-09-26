@@ -133,11 +133,71 @@ abstract class AppLocalizations {
   /// **'Par: {time}'**
   String levelPlayWonParLabel(String time);
 
-  /// Temporary home page button that opens the sample level
+  /// The level's best saved time on the win overlay
   ///
   /// In en, this message translates to:
-  /// **'Play First Roll'**
-  String get homePlayFirstRoll;
+  /// **'Best: {time}'**
+  String levelPlayWonBestLabel(String time);
+
+  /// Badge shown on the win overlay when this run set a new best time
+  ///
+  /// In en, this message translates to:
+  /// **'New best!'**
+  String get levelPlayWonNewBestBadge;
+
+  /// Button on the win overlay that opens the next level
+  ///
+  /// In en, this message translates to:
+  /// **'Next'**
+  String get levelPlayWonNext;
+
+  /// Button on the win overlay that replays the same level
+  ///
+  /// In en, this message translates to:
+  /// **'Retry'**
+  String get levelPlayWonRetry;
+
+  /// The level select screen's title
+  ///
+  /// In en, this message translates to:
+  /// **'Levels'**
+  String get levelSelectTitle;
+
+  /// Shown when the level manifest fails to load
+  ///
+  /// In en, this message translates to:
+  /// **'Levels could not be loaded.'**
+  String get levelSelectErrorMessage;
+
+  /// A level's best saved time in the level list
+  ///
+  /// In en, this message translates to:
+  /// **'Best: {time}'**
+  String levelSelectBestTimeLabel(String time);
+
+  /// Shown in the level list when a level has no saved best time
+  ///
+  /// In en, this message translates to:
+  /// **'No best time yet'**
+  String get levelSelectNoBestTime;
+
+  /// Shown in the level list when the player's best time beats par
+  ///
+  /// In en, this message translates to:
+  /// **'Par beaten'**
+  String get levelSelectParBeaten;
+
+  /// Shown in the level list when the player has not yet beaten par
+  ///
+  /// In en, this message translates to:
+  /// **'Par not beaten'**
+  String get levelSelectParNotBeaten;
+
+  /// Shown in the level list when a level has no par time
+  ///
+  /// In en, this message translates to:
+  /// **'No par time'**
+  String get levelSelectParNone;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

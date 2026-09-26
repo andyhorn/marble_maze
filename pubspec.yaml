@@ -9,6 +9,8 @@ workspace:
   - features/level/level_data
   - features/level/level_domain
   - features/level/level_presentation
+  - features/progress/progress_data_shared_preferences
+  - features/progress/progress_domain
   - features/simulation/simulation_domain
   - features/simulation/simulation_data_box3d
   - features/tilt/tilt_domain

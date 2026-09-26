@@ -7,43 +7,58 @@ import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
 import 'package:marble_maze_app/app/app.dart';
 import 'package:marble_maze_app/app/routes/app_routes.dart';
-import 'package:marble_maze_app/app/view/home_page.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:progress_domain/progress_domain.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
+
+class _MockProgressRepository extends Mock implements IProgressRepository;
 
 void main() {
   group('App', () {
     late _MockLevelsRepository repository;
+    late _MockProgressRepository progressRepository;
 
     setUp(() {
       repository = _MockLevelsRepository();
+      progressRepository = _MockProgressRepository();
+      when(() => repository.getManifest()).thenAnswer(
+        (_) async => const [
+          LevelManifestEntry(id: 'first_roll', title: 'First Roll'),
+        ],
+      );
+      when(() => progressRepository.getRecords()).thenAnswer((_) async => {});
     });
 
-    Widget buildSubject() {
+    Widget buildSubject({GoRouter? router}) {
       return RepositoryProvider<ILevelsRepository>.value(
         value: repository,
-        child: App(router: GoRouter(routes: $appRoutes)),
+        child: RepositoryProvider<IProgressRepository>.value(
+          value: progressRepository,
+          child: App(router: router ?? GoRouter(routes: $appRoutes)),
+        ),
       );
     }
 
-    testWidgets('renders the home page at the initial route', (tester) async {
-      await tester.pumpWidget(buildSubject());
-
-      expect(find.byType(HomePage), findsOneWidget);
-    });
-
-    testWidgets('opens the level play route from the home page', (
+    testWidgets('renders the level select screen at the initial route', (
       tester,
     ) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+
+      expect(find.text('First Roll'), findsOneWidget);
+    });
+
+    testWidgets('opens the level play route from level select', (tester) async {
       // A never-completing future, rather than Future.delayed, so no timer
       // is left pending when the test tears down.
       when(() => repository.getLevel('first_roll'))
           .thenAnswer((_) => Completer<Level>().future);
 
       await tester.pumpWidget(buildSubject());
-      await tester.tap(find.text('Play First Roll'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('First Roll'));
       // Not pumpAndSettle: the loading view's CircularProgressIndicator
       // animates indefinitely, so it never settles.
       await tester.pump();
@@ -57,12 +72,40 @@ void main() {
           .thenThrow(const LevelNotFoundException('first_roll'));
 
       await tester.pumpWidget(buildSubject());
-      await tester.tap(find.text('Play First Roll'));
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('First Roll'));
       await tester.pumpAndSettle();
       await tester.tap(find.text('Back to levels'));
       await tester.pumpAndSettle();
 
-      expect(find.byType(HomePage), findsOneWidget);
+      expect(find.text('First Roll'), findsOneWidget);
     });
+
+    testWidgets(
+      'replacing the level play route with a different id reloads the '
+      "level, matching what the win overlay's Next button does",
+      (tester) async {
+        when(() => repository.getLevel('first_roll'))
+            .thenAnswer((_) => Completer<Level>().future);
+        when(() => repository.getLevel('second_roll'))
+            .thenAnswer((_) => Completer<Level>().future);
+        final router = GoRouter(
+          routes: $appRoutes,
+          initialLocation: '/level/first_roll',
+        );
+
+        await tester.pumpWidget(buildSubject(router: router));
+        await tester.pump();
+        await tester.pump();
+        verify(() => repository.getLevel('first_roll')).called(1);
+
+        const LevelPlayRoute(id: 'second_roll')
+            .replace(tester.element(find.byType(LevelPlayLoadingView)));
+        await tester.pump();
+        await tester.pump();
+
+        verify(() => repository.getLevel('second_roll')).called(1);
+      },
+    );
   });
 }
