@@ -1,8 +1,10 @@
-import 'package:flutter/material.dart';
+import 'package:material_ui/material_ui.dart';
 
+/// Full-screen page that hosts a 3D scene view.
 class ScenePreviewPage extends StatelessWidget {
   const new({required this.sceneView, super.key});
 
+  /// The 3D view to show.
   final Widget sceneView;
 
   @override

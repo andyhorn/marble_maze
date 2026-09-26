@@ -2,6 +2,7 @@ import 'package:marble_maze_app/l10n/l10n.dart';
 import 'package:marble_maze_app/scene_preview/scene_preview.dart';
 import 'package:material_ui/material_ui.dart';
 
+/// The root widget of the app.
 class App extends StatelessWidget {
   const new({super.key, this.sceneView = const CubeSceneView()});
 

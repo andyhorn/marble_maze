@@ -1,9 +1,10 @@
 import 'dart:async';
 
-import 'package:flutter/material.dart';
 import 'package:flutter_scene/scene.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
+/// Renders a single lit cube with flutter_scene.
 class CubeSceneView extends StatefulWidget {
   const new({super.key});
 
