@@ -1,6 +1,6 @@
-import 'package:marble_maze_app/app/app.dart';
+import 'package:marble_maze_app/app/build_app.dart';
 import 'package:marble_maze_app/bootstrap.dart';
 
 Future<void> main() async {
-  await bootstrap(() => const App());
+  await bootstrap(buildApp);
 }

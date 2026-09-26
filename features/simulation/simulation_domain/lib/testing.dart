@@ -1,0 +1,96 @@
+/// A reusable contract test suite for [IMarbleSimulation] implementations.
+///
+/// A physics backend's own test suite calls [runMarbleSimulationContractTests]
+/// with a factory that builds a fresh [MarbleSimulationHarness] for each
+/// test.
+library;
+
+import 'package:level_domain/level_domain.dart';
+import 'package:simulation_domain/simulation_domain.dart';
+import 'package:test/test.dart';
+import 'package:tilt_domain/tilt_domain.dart';
+
+/// A simulation under test, paired with the [MarbleTestHandle] the contract
+/// suite uses to set up each scenario.
+class MarbleSimulationHarness {
+  /// Creates a contract-test harness.
+  const new({required this.simulation, required this.handle});
+
+  /// The simulation under test.
+  final IMarbleSimulation simulation;
+
+  /// The backend's hook for placing/moving the marble directly.
+  final MarbleTestHandle handle;
+}
+
+const _frame = Duration(milliseconds: 16);
+const _settleTime = Duration(milliseconds: 1000);
+const _rollTime = Duration(milliseconds: 500);
+const _rollTilt = 0.15;
+
+Level _flatLevel() => const Level(
+  id: 'contract-test',
+  title: 'Contract Test',
+  width: 9,
+  height: 9,
+  start: GridPoint(column: 4, row: 4),
+  exit: GridPoint(column: 8, row: 8),
+  holes: [],
+  walls: [],
+);
+
+void _stepFor(IMarbleSimulation simulation, Tilt tilt, Duration duration) {
+  var remaining = duration;
+  while (remaining > Duration.zero) {
+    final step = remaining < _frame ? remaining : _frame;
+    simulation.step(tilt, step);
+    remaining -= step;
+  }
+}
+
+/// Runs the [IMarbleSimulation] contract tests against harnesses built by
+/// [create], one fresh harness per test.
+void runMarbleSimulationContractTests(
+  MarbleSimulationHarness Function() create,
+) {
+  group('IMarbleSimulation contract', () {
+    late MarbleSimulationHarness harness;
+
+    setUp(() {
+      harness = create();
+      harness.simulation.load(_flatLevel());
+      // A freshly loaded marble may be asleep at rest; let it settle before
+      // each scenario so tilting is guaranteed to wake and move it.
+      _stepFor(harness.simulation, Tilt.flat, _settleTime);
+    });
+
+    tearDown(() {
+      harness.simulation.dispose();
+    });
+
+    test('tilt right moves the marble toward +X', () {
+      final startX = harness.simulation.marble.position.x;
+
+      _stepFor(harness.simulation, Tilt(x: _rollTilt, y: 0), _rollTime);
+
+      expect(harness.simulation.marble.position.x, greaterThan(startX));
+    });
+
+    test('tilt forward moves the marble toward -Z', () {
+      final startZ = harness.simulation.marble.position.z;
+
+      _stepFor(harness.simulation, Tilt(x: 0, y: _rollTilt), _rollTime);
+
+      expect(harness.simulation.marble.position.z, lessThan(startZ));
+    });
+
+    test('a resting marble on a flat board stays at rest', () {
+      final start = harness.simulation.marble.position.clone();
+
+      _stepFor(harness.simulation, Tilt.flat, _rollTime);
+
+      final moved = harness.simulation.marble.position.distanceTo(start);
+      expect(moved, lessThan(0.05));
+    });
+  });
+}

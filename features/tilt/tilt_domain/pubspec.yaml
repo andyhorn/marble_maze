@@ -1,0 +1,15 @@
+name: tilt_domain
+description: Domain models for mapping touch and sensor input into board tilt.
+version: 0.1.0+1
+publish_to: none
+resolution: workspace
+
+environment:
+  sdk: ^3.13.0
+
+dependencies:
+  meta: ^1.16.0
+
+dev_dependencies:
+  test: ^1.31.0
+  very_good_analysis: ^11.0.0

@@ -6,7 +6,11 @@ environment:
 
 workspace:
   - apps/marble_maze_app
+  - features/level/level_domain
+  - features/level/level_presentation
+  - features/simulation/simulation_domain
   - features/simulation/simulation_data_box3d
+  - features/tilt/tilt_domain
 
 dev_dependencies:
   melos: ^8.9.0
