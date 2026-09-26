@@ -1,0 +1,44 @@
+name: marble_maze_workspace
+publish_to: none
+
+environment:
+  sdk: ^3.13.0
+
+workspace:
+  - apps/marble_maze_app
+  - features/simulation/simulation_data_box3d
+
+dev_dependencies:
+  melos: ^8.9.0
+
+melos:
+  scripts:
+    analyze:
+      description: Analyze every package.
+      exec: dart analyze --fatal-infos .
+
+    format:
+      description: Format every package.
+      exec: dart format .
+
+    format:check:
+      description: Fail if any package is not formatted.
+      exec: dart format --set-exit-if-changed .
+
+    test:
+      description: Run the tests of every package.
+      run: melos run test:dart --no-select && melos run test:flutter --no-select
+
+    test:dart:
+      description: Run the tests of every pure Dart package.
+      exec: dart test
+      packageFilters:
+        flutter: false
+        dirExists: test
+
+    test:flutter:
+      description: Run the tests of every Flutter package.
+      exec: flutter test
+      packageFilters:
+        flutter: true
+        dirExists: test
