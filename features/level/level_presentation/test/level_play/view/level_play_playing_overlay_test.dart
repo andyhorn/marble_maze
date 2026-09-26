@@ -2,12 +2,15 @@ import 'package:flutter_test/flutter_test.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
 import 'package:mocktail/mocktail.dart';
+import 'package:progress_domain/progress_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
 import '../../helpers/fake_stopwatch.dart';
 import '../../helpers/pump_app.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
+
+class _MockProgressRepository extends Mock implements IProgressRepository;
 
 class _FakeTiltRepository implements ITiltRepository {
   bool isAvailableResult = true;
@@ -41,6 +44,7 @@ void main() {
       );
       cubit = LevelPlayCubit(
         repository: repository,
+        progressRepository: _MockProgressRepository(),
         stopwatchFactory: FakeStopwatch.new,
       );
     });

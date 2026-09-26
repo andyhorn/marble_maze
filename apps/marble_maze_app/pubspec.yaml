@@ -27,6 +27,10 @@ dependencies:
   localizations:
     path: ../../shared/localizations
   material_ui: ^1.1.1
+  progress_data_shared_preferences:
+    path: ../../features/progress/progress_data_shared_preferences
+  progress_domain:
+    path: ../../features/progress/progress_domain
   simulation_data_box3d:
     path: ../../features/simulation/simulation_data_box3d
   tilt_data_sensors_plus:

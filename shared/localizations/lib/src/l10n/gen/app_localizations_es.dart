@@ -34,7 +34,41 @@ class AppLocalizationsEs extends AppLocalizations {
   }
 
   @override
-  String get homePlayFirstRoll => 'Jugar Primera Vuelta';
+  String levelPlayWonBestLabel(String time) {
+    return 'Mejor: $time';
+  }
+
+  @override
+  String get levelPlayWonNewBestBadge => '¡Nuevo mejor tiempo!';
+
+  @override
+  String get levelPlayWonNext => 'Siguiente';
+
+  @override
+  String get levelPlayWonRetry => 'Reintentar';
+
+  @override
+  String get levelSelectTitle => 'Niveles';
+
+  @override
+  String get levelSelectErrorMessage => 'No se pudieron cargar los niveles.';
+
+  @override
+  String levelSelectBestTimeLabel(String time) {
+    return 'Mejor: $time';
+  }
+
+  @override
+  String get levelSelectNoBestTime => 'Sin mejor tiempo aún';
+
+  @override
+  String get levelSelectParBeaten => 'Par superado';
+
+  @override
+  String get levelSelectParNotBeaten => 'Par no superado';
+
+  @override
+  String get levelSelectParNone => 'Sin tiempo par';
 
   @override
   String get levelPlayDragToTiltHint => 'Arrastra para inclinar';

@@ -13,6 +13,7 @@ import 'package:level_presentation/level_play/view/level_play_ready_overlay.dart
 import 'package:level_presentation/level_play/view/level_play_view.dart';
 import 'package:level_presentation/level_play/view/level_play_won_overlay.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:progress_domain/progress_domain.dart';
 import 'package:simulation_domain/simulation_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
@@ -30,19 +31,22 @@ typedef BoardBuilder = Widget Function({
 });
 
 /// The level play screen's module: wires a level play cubit to the
-/// [ILevelsRepository] from context, and shows loading, the board with its
-/// state-specific overlay, or an error view for [levelId].
+/// [ILevelsRepository] and [IProgressRepository] from context, and shows
+/// loading, the board with its state-specific overlay, or an error view for
+/// [levelId].
 class LevelPlayModule extends StatelessWidget {
   /// Creates a level play module for [levelId].
   ///
   /// [simulationFactory] builds the [IMarbleSimulation] used once the level
   /// loads; [onExitToLevels] is called from the error and won views' back
-  /// button. [boardBuilder] defaults to building a [BoardSceneView]; widget
-  /// tests override it with a placeholder.
+  /// button, and [onNextLevel] from the won view's Next button.
+  /// [boardBuilder] defaults to building a [BoardSceneView]; widget tests
+  /// override it with a placeholder.
   const new({
     required this.levelId,
     required this.simulationFactory,
     required this.onExitToLevels,
+    required this.onNextLevel,
     this.boardBuilder = BoardSceneView.new,
     super.key,
   });
@@ -57,6 +61,10 @@ class LevelPlayModule extends StatelessWidget {
   /// back to levels from the win overlay.
   final VoidCallback onExitToLevels;
 
+  /// Called with the next level's id when the player taps Next on the win
+  /// overlay.
+  final ValueChanged<String> onNextLevel;
+
   /// Builds the 3D board view. Defaults to [BoardSceneView.new].
   final BoardBuilder boardBuilder;
 
@@ -66,6 +74,7 @@ class LevelPlayModule extends StatelessWidget {
       create: (context) {
         final cubit = LevelPlayCubit(
           repository: context.read<ILevelsRepository>(),
+          progressRepository: context.read<IProgressRepository>(),
         );
         unawaited(cubit.load(levelId));
         return cubit;
@@ -73,6 +82,7 @@ class LevelPlayModule extends StatelessWidget {
       child: _LevelPlayModuleBody(
         simulationFactory: simulationFactory,
         onExitToLevels: onExitToLevels,
+        onNextLevel: onNextLevel,
         boardBuilder: boardBuilder,
       ),
     );
@@ -83,11 +93,13 @@ class _LevelPlayModuleBody extends StatefulWidget {
   const new({
     required this.simulationFactory,
     required this.onExitToLevels,
+    required this.onNextLevel,
     required this.boardBuilder,
   });
 
   final IMarbleSimulation Function() simulationFactory;
   final VoidCallback onExitToLevels;
+  final ValueChanged<String> onNextLevel;
   final BoardBuilder boardBuilder;
 
   @override
@@ -125,7 +137,13 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   @override
   Widget build(BuildContext context) {
     final cubit = context.read<LevelPlayCubit>();
-    return BlocBuilder<LevelPlayCubit, LevelPlayState>(
+    return BlocConsumer<LevelPlayCubit, LevelPlayState>(
+      // Retry moves Won back to Ready without recreating the simulation, so
+      // the marble must be explicitly respawned to the start; a fresh load
+      // never reaches here with a simulation already built.
+      listener: (context, state) {
+        if (state is LevelPlayReady) _simulation?.respawn();
+      },
       builder: (context, state) => switch (state) {
         LevelPlayLoading() => const LevelPlayLoadingView(),
         LevelPlayReady(:final level) => LevelPlayView(
@@ -161,22 +179,36 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             controller: _controller,
           ),
         ),
-        LevelPlayWon(:final level, :final time, :final par) => LevelPlayView(
-          boardView: widget.boardBuilder(
-            level: level,
-            simulation: _simulationForPlay,
-            isSimulationActive: false,
-            controller: _controller,
-            onMarbleFell: cubit.marbleFell,
-            onMarbleRespawned: cubit.marbleRespawned,
-            onReachedExit: cubit.marbleReachedExit,
+        LevelPlayWon(
+          :final level,
+          :final time,
+          :final par,
+          :final bestTime,
+          :final isNewBest,
+          :final nextLevelId,
+        ) =>
+          LevelPlayView(
+            boardView: widget.boardBuilder(
+              level: level,
+              simulation: _simulationForPlay,
+              isSimulationActive: false,
+              controller: _controller,
+              onMarbleFell: cubit.marbleFell,
+              onMarbleRespawned: cubit.marbleRespawned,
+              onReachedExit: cubit.marbleReachedExit,
+            ),
+            overlay: LevelPlayWonOverlay(
+              time: time,
+              par: par,
+              bestTime: bestTime,
+              isNewBest: isNewBest,
+              onNext: nextLevelId == null
+                  ? null
+                  : () => widget.onNextLevel(nextLevelId),
+              onRetry: cubit.retry,
+              onBackToLevels: widget.onExitToLevels,
+            ),
           ),
-          overlay: LevelPlayWonOverlay(
-            time: time,
-            par: par,
-            onBackToLevels: widget.onExitToLevels,
-          ),
-        ),
         LevelPlayError() => LevelPlayErrorView(
           onBackToLevels: widget.onExitToLevels,
         ),

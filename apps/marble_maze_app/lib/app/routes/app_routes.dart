@@ -1,19 +1,21 @@
 import 'package:go_router/go_router.dart';
 import 'package:level_presentation/level_presentation.dart';
-import 'package:marble_maze_app/app/view/home_page.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:simulation_data_box3d/simulation_data_box3d.dart';
 
 part 'app_routes.g.dart';
 
-/// The temporary home route. Level select replaces this once it exists.
-@TypedGoRoute<HomeRoute>(path: '/')
-class HomeRoute extends GoRouteData with $HomeRoute {
-  /// Creates the home route.
+/// The level select route: every bundled level, with its best time and par
+/// status.
+@TypedGoRoute<LevelSelectRoute>(path: '/')
+class LevelSelectRoute extends GoRouteData with $LevelSelectRoute {
+  /// Creates the level select route.
   const new();
 
   @override
-  Widget build(BuildContext context, GoRouterState state) => const HomePage();
+  Widget build(BuildContext context, GoRouterState state) => LevelSelectModule(
+    onLevelSelected: (id) => LevelPlayRoute(id: id).push<void>(context),
+  );
 }
 
 /// The level play route: loads and plays the level with [id].
@@ -27,8 +29,13 @@ class LevelPlayRoute extends GoRouteData with $LevelPlayRoute {
 
   @override
   Widget build(BuildContext context, GoRouterState state) => LevelPlayModule(
+    // Keyed by id: Next replaces this route in place with a new id, and
+    // without a key the element (and its cubit and simulation) would be
+    // reused for the old level instead of being rebuilt for the new one.
+    key: ValueKey(id),
     levelId: id,
     simulationFactory: Box3dMarbleSimulation.new,
-    onExitToLevels: () => const HomeRoute().go(context),
+    onExitToLevels: () => const LevelSelectRoute().go(context),
+    onNextLevel: (nextId) => LevelPlayRoute(id: nextId).replace(context),
   );
 }

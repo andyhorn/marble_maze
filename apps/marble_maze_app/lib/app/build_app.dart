@@ -4,13 +4,17 @@ import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:go_router/go_router.dart';
 import 'package:level_data/level_data.dart';
 import 'package:level_domain/level_domain.dart';
+import 'package:level_presentation/level_presentation.dart';
 import 'package:marble_maze_app/app/routes/app_routes.dart';
 import 'package:marble_maze_app/app/view/app.dart';
 import 'package:material_ui/material_ui.dart';
+import 'package:progress_data_shared_preferences/progress_data_shared_preferences.dart';
+import 'package:progress_domain/progress_domain.dart';
 import 'package:tilt_data_sensors_plus/tilt_data_sensors_plus.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
 /// Builds the app: a [LevelsRepository] reading bundled level assets, a
+/// [SharedPreferencesProgressRepository] for saved best times, a
 /// [SensorsPlusTiltRepository] for tilt input, and the typed [GoRouter]
 /// routes.
 ///
@@ -23,14 +27,19 @@ Future<Widget> buildApp() async {
   final levelsRepository = LevelsRepository(
     dataSource: AssetLevelDataSource(loader: rootBundle.loadString),
   );
+  final progressRepository = SharedPreferencesProgressRepository();
   final tiltRepository = SensorsPlusTiltRepository();
-  final router = GoRouter(routes: $appRoutes);
+  final router = GoRouter(
+    routes: $appRoutes,
+    observers: [levelSelectRouteObserver],
+  );
 
-  return RepositoryProvider<ILevelsRepository>.value(
-    value: levelsRepository,
-    child: RepositoryProvider<ITiltRepository>.value(
-      value: tiltRepository,
-      child: App(router: router),
-    ),
+  return MultiRepositoryProvider(
+    providers: [
+      RepositoryProvider<ILevelsRepository>.value(value: levelsRepository),
+      RepositoryProvider<IProgressRepository>.value(value: progressRepository),
+      RepositoryProvider<ITiltRepository>.value(value: tiltRepository),
+    ],
+    child: App(router: router),
   );
 }
