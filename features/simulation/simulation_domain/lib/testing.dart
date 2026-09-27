@@ -36,6 +36,11 @@ const _settleTime = Duration(milliseconds: 1000);
 const _rollTime = Duration(milliseconds: 500);
 const _rollTilt = 0.15;
 
+// A launched marble's speed decays under linear damping, so this has to be
+// fast enough that the marble still covers the two cells to a hole, the
+// exit, or a wall before rolling resistance stops it.
+const _launchSpeed = 10.0;
+
 // Long enough for a marble launched two cells from a hole to reach its centre
 // once friction has turned the launch into rolling.
 const _holeApproachTime = Duration(milliseconds: 1500);
@@ -167,7 +172,7 @@ void runMarbleSimulationContractTests(
       test('a wall stops the marble', () {
         final restY = harness.simulation.marble.position.y;
         harness.handle.placeMarble(Vector3(_wallX - 2, restY, 0));
-        harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+        harness.handle.setMarbleVelocity(Vector3(_launchSpeed, 0, 0));
 
         _stepFor(
           harness.simulation,
@@ -202,7 +207,7 @@ void runMarbleSimulationContractTests(
           final subscription = harness.simulation.events.listen(events.add);
           final restY = harness.simulation.marble.position.y;
           harness.handle.placeMarble(Vector3(_wallX - 2, restY, 0));
-          harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+          harness.handle.setMarbleVelocity(Vector3(_launchSpeed, 0, 0));
 
           _stepFor(
             harness.simulation,
@@ -246,7 +251,7 @@ void runMarbleSimulationContractTests(
         final subscription = harness.simulation.events.listen(events.add);
         final restY = harness.simulation.marble.position.y;
         harness.handle.placeMarble(Vector3(_holeX - 2, restY, 0));
-        harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+        harness.handle.setMarbleVelocity(Vector3(_launchSpeed, 0, 0));
 
         _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
         await pumpEventQueue();
@@ -281,7 +286,7 @@ void runMarbleSimulationContractTests(
         () async {
           final restY = harness.simulation.marble.position.y;
           harness.handle.placeMarble(Vector3(_holeX - 2, restY, 0));
-          harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+          harness.handle.setMarbleVelocity(Vector3(_launchSpeed, 0, 0));
           _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
           await pumpEventQueue();
           expect(harness.simulation.marble.isActive, isFalse);
@@ -311,7 +316,7 @@ void runMarbleSimulationContractTests(
         final subscription = harness.simulation.events.listen(events.add);
         final restY = harness.simulation.marble.position.y;
         harness.handle.placeMarble(Vector3(_exitX - 2, restY, 0));
-        harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+        harness.handle.setMarbleVelocity(Vector3(_launchSpeed, 0, 0));
 
         _stepFor(harness.simulation, Tilt.flat, _holeApproachTime);
         await pumpEventQueue();
