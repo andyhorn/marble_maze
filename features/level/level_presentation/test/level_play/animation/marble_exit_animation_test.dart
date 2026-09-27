@@ -39,7 +39,7 @@ void main() {
       'sink offset starts at 0 and reaches the full depth once complete',
       () {
         expect(animation.sinkOffsetAt(Duration.zero), 0);
-        expect(animation.sinkOffsetAt(const Duration(milliseconds: 600)), 0.25);
+        expect(animation.sinkOffsetAt(const Duration(milliseconds: 600)), 0.5);
       },
     );
 

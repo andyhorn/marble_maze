@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:math' as math;
+import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
@@ -34,12 +35,45 @@ const _hapticsDecider = HapticsDecider();
 const _environmentAsset =
     'packages/level_presentation/assets/hdr/studio_small_03_1k.hdr';
 
+/// The wood base-colour texture used for the floor and walls. See
+/// `assets/textures/ASSETS.md` for its source and licence.
+const _woodTextureAsset =
+    'packages/level_presentation/assets/textures/'
+    'fine_grained_wood_col_1k.jpg';
+
+/// The generated marble base-colour swirl texture. See
+/// `assets/textures/ASSETS.md` for how it's built.
+const _marbleTextureAsset =
+    'packages/level_presentation/assets/textures/marble_swirl.png';
+
+/// How many world units of wood texture map to one UV tile. Chosen so the
+/// grain doesn't stretch across the whole board, and, being a non-integer
+/// fraction of a 1-unit cell, doesn't visibly repeat in lockstep with cell
+/// boundaries either.
+const double _woodUvUnitsPerTile = 1.6;
+
+/// How deep, in world units, a hole's or the exit's cup is recessed below
+/// the floor. `MarbleSinkAnimation` and `MarbleExitAnimation`'s default
+/// depths match this, so the marble comes to rest exactly at the bottom.
+const double _cupDepth = 0.5;
+
+/// The touch tilt's contribution to the board's visual rotation, scaled
+/// down from a full physical tilt since it is only a touch-mode cue: with
+/// the accelerometer, the phone itself is the board, so the rendered board
+/// must stay fixed to the screen.
+const double _visualTiltScale = 0.5;
+
 /// Renders the board and marble with flutter_scene, and drives the frame
 /// loop: reads the current tilt from [controller], steps [simulation], and
 /// updates the scene from it.
 ///
-/// The board root node's rotation is visual only, from the current tilt;
-/// gravity, not board rotation, drives the physics inside [simulation].
+/// The board stays fixed to the screen: with the accelerometer, the phone
+/// itself is the board, so the rendered board does not rotate with the
+/// physical tilt.
+/// The board root node's rotation instead follows [controller]'s
+/// `visualTilt`, a small, scaled-down touch-mode cue shown only while a
+/// finger is down or easing back to flat after release. Gravity, not board
+/// rotation, drives the physics inside [simulation] either way.
 ///
 /// On a [FellInHole] or [LeftBoard] simulation event, this plays a sink
 /// animation on the marble, then calls `simulation.respawn()`. [onMarbleFell]
@@ -100,6 +134,8 @@ class _BoardSceneViewState extends State<BoardSceneView>
   StreamSubscription<SimulationEvent>? _eventsSubscription;
   final FrameClock _frameClock = FrameClock();
   Duration? _fallStartElapsed;
+  vm.Vector3? _fallStartPosition;
+  vm.Vector3? _fallTargetCupCenter;
   Duration? _exitStartElapsed;
   vm.Vector3? _exitStartPosition;
   Duration? _lastWallHitImpactElapsed;
@@ -127,8 +163,21 @@ class _BoardSceneViewState extends State<BoardSceneView>
     _handleHaptics(event);
     if (_isFalling) return;
     switch (event) {
-      case FellInHole() || LeftBoard():
+      case FellInHole(:final hole):
         _fallStartElapsed = _lastElapsed;
+        _fallStartPosition = widget.simulation.marble.position.clone();
+        _fallTargetCupCenter = gridPointCenter(
+          hole,
+          width: widget.level.width,
+          height: widget.level.height,
+        );
+        widget.onMarbleFell();
+      case LeftBoard():
+        // No cup to roll toward: sinks straight down where it left the
+        // board.
+        _fallStartElapsed = _lastElapsed;
+        _fallStartPosition = widget.simulation.marble.position.clone();
+        _fallTargetCupCenter = null;
         widget.onMarbleFell();
       case ReachedExit():
         // The exit animation plays in the Won state, while the simulation
@@ -150,11 +199,11 @@ class _BoardSceneViewState extends State<BoardSceneView>
     switch (impact) {
       case HapticImpact.none:
         return;
-      case HapticImpact.light:
-        _lastWallHitImpactElapsed = _lastElapsed;
-        unawaited(HapticFeedback.lightImpact());
       case HapticImpact.medium:
+        _lastWallHitImpactElapsed = _lastElapsed;
         unawaited(HapticFeedback.mediumImpact());
+      case HapticImpact.heavy:
+        unawaited(HapticFeedback.heavyImpact());
     }
   }
 
@@ -163,28 +212,33 @@ class _BoardSceneViewState extends State<BoardSceneView>
     // available once the engine's static resources are loaded.
     await Scene.initializeStaticResources();
 
-    _buildBoard();
+    final woodTexture = await Texture2D.fromAsset(_woodTextureAsset);
+    final marbleTexture = await Texture2D.fromAsset(_marbleTextureAsset);
+
+    _buildBoard(woodTexture);
     _marbleNode = Node(
       mesh: Mesh(
         SphereGeometry(radius: kMarbleRadius),
         PhysicallyBasedMaterial()
-          ..metallicFactor = 1
-          ..roughnessFactor = 0.12,
+          ..baseColorTexture = marbleTexture
+          ..metallicFactor = 0
+          ..roughnessFactor = 0.35,
       ),
     );
+    _boardRoot.add(_marbleNode);
     _camera = PerspectiveCamera(
       position: vm.Vector3(0, 8, -6),
       target: vm.Vector3(0, 0, 0),
     );
     _scene
       ..add(_boardRoot)
-      ..add(_marbleNode)
       ..directionalLight = DirectionalLight(
         direction: vm.Vector3(-0.4, -1, 0.5),
         castsShadow: true,
       )
-      ..postProcess.bloom.enabled = true
-      ..postProcess.bloom.intensity = 0.08;
+      // A patterned, non-metallic marble no longer needs a mirror highlight
+      // bloomed out; disabled so it doesn't wash out the swirl texture.
+      ..postProcess.bloom.enabled = false;
     unawaited(_scene.loadEnvironment(_environmentAsset));
 
     if (!mounted) return;
@@ -192,25 +246,46 @@ class _BoardSceneViewState extends State<BoardSceneView>
     _ticker = createTicker(_onTick)..start();
   }
 
-  static const Color _woodColor = Colors.brown;
   static const Color _cupColor = Color(0xFF141414);
   static const Color _exitCupColor = Colors.amber;
 
-  static PhysicallyBasedMaterial _woodMaterial() => PhysicallyBasedMaterial()
-    ..baseColorFactor = _colorToVector4(_woodColor)
-    ..roughnessFactor = 0.75;
+  /// `doubleSided` since floor tiles, opening rings, and wall faces are
+  /// hand-built flat quads (see [_quadGeometry]); getting every face's
+  /// winding order exactly right for backface culling is unnecessary risk
+  /// for geometry this thin.
+  static PhysicallyBasedMaterial _woodMaterial(Texture2D texture) =>
+      PhysicallyBasedMaterial()
+        ..baseColorTexture = texture
+        ..metallicFactor = 0
+        ..roughnessFactor = 0.75
+        ..doubleSided = true;
 
-  void _buildBoard() {
+  void _buildBoard(Texture2D woodTexture) {
     final level = widget.level;
-    final floor = Node(
-      mesh: Mesh(
-        CuboidGeometry(
-          vm.Vector3(level.width.toDouble(), 0.2, level.height.toDouble()),
-        ),
-        _woodMaterial(),
-      ),
-    )..position = vm.Vector3(0, -0.1, 0);
-    _boardRoot.add(floor);
+    final wood = _woodMaterial(woodTexture);
+    final openings = {...level.holes, level.exit};
+
+    for (var row = 0; row < level.height; row++) {
+      for (var column = 0; column < level.width; column++) {
+        final point = GridPoint(column: column, row: row);
+        final center = gridPointCenter(
+          point,
+          width: level.width,
+          height: level.height,
+        );
+        if (openings.contains(point)) {
+          _boardRoot.add(
+            _floorOpeningRing(
+              center: center,
+              holeRadius: point == level.exit ? kExitRadius : kHoleRadius,
+              material: wood,
+            ),
+          );
+        } else {
+          _boardRoot.add(_floorTile(center: center, material: wood));
+        }
+      }
+    }
 
     for (final wall in level.walls) {
       final placement = wallRunPlacement(
@@ -218,21 +293,17 @@ class _BoardSceneViewState extends State<BoardSceneView>
         width: level.width,
         height: level.height,
       );
-      final wallNode =
-          Node(
-              mesh: Mesh(
-                CuboidGeometry(
-                  vm.Vector3(placement.halfLength * 2, kWallHeight, 1),
-                ),
-                _woodMaterial(),
-              ),
-            )
-            ..position = vm.Vector3(
-              placement.center.x,
-              kWallHeight / 2,
-              placement.center.z,
-            );
-      _boardRoot.add(wallNode);
+      _boardRoot.add(
+        _worldUvBoxNode(
+          center: vm.Vector3(
+            placement.center.x,
+            kWallHeight / 2,
+            placement.center.z,
+          ),
+          halfExtents: vm.Vector3(placement.halfLength, kWallHeight / 2, 0.5),
+          material: wood,
+        ),
+      );
     }
 
     for (final hole in level.holes) {
@@ -253,10 +324,32 @@ class _BoardSceneViewState extends State<BoardSceneView>
   static vm.Vector4 _colorToVector4(Color color) =>
       vm.Vector4(color.r, color.g, color.b, color.a);
 
-  /// A short, dark cylinder standing in for a cup set into the floor: the
-  /// floor is a single solid box with its top surface at world Y 0, so a
-  /// collider actually recessed below it would be hidden inside the floor
-  /// mesh. This sits flush with the floor instead of visibly recessed.
+  /// A flat, world-UV-mapped quad for one non-opening floor cell.
+  Node _floorTile({
+    required vm.Vector3 center,
+    required PhysicallyBasedMaterial material,
+  }) => Node(mesh: Mesh(_worldUvQuad(center: center), material));
+
+  /// A flat quad covering a cell except for a round opening of [holeRadius]
+  /// at its center, so the hole or exit's cup below shows through a real
+  /// gap in the floor rather than the marble rolling over painted-on solid
+  /// ground.
+  Node _floorOpeningRing({
+    required vm.Vector3 center,
+    required double holeRadius,
+    required PhysicallyBasedMaterial material,
+  }) => Node(
+    mesh: Mesh(
+      _worldUvAnnulus(center: center, innerRadius: holeRadius),
+      material,
+    ),
+  );
+
+  /// A cup recessed [_cupDepth] below the floor: an open-topped cylinder (a
+  /// side wall plus a bottom cap) so the marble visibly drops into it
+  /// through the matching opening in the floor. `doubleSided` since the
+  /// wall's inside face, the one the camera actually sees, would otherwise
+  /// be back-face culled.
   Node _buildCup(
     GridPoint point, {
     required double radius,
@@ -270,13 +363,19 @@ class _BoardSceneViewState extends State<BoardSceneView>
     );
     return Node(
       mesh: Mesh(
-        CylinderGeometry(bottomRadius: radius, topRadius: radius, height: 0.04),
+        CylinderGeometry(
+          bottomRadius: radius,
+          topRadius: radius,
+          height: _cupDepth,
+          topCap: false,
+        ),
         PhysicallyBasedMaterial()
           ..baseColorFactor = _colorToVector4(color)
           ..metallicFactor = 0
-          ..roughnessFactor = 0.85,
+          ..roughnessFactor = 0.85
+          ..doubleSided = true,
       ),
-    )..position = vm.Vector3(center.x, 0.02, center.z);
+    )..position = vm.Vector3(center.x, -_cupDepth / 2, center.z);
   }
 
   void _onTick(Duration elapsed) {
@@ -299,9 +398,21 @@ class _BoardSceneViewState extends State<BoardSceneView>
       widget.simulation.step(tilt, delta);
     }
 
+    // The board stays fixed to the screen except for this small visual
+    // tilt, a touch-mode cue rather than a physical rotation: with the
+    // accelerometer, the phone itself is the board, so rotating it to match
+    // [tilt] (which the marble's physics actually uses) would double-tilt
+    // it from the player's point of view.
+    final visualTilt = widget.controller.visualTilt;
     _boardRoot.rotation =
-        vm.Quaternion.axisAngle(vm.Vector3(0, 0, 1), -tilt.x) *
-        vm.Quaternion.axisAngle(vm.Vector3(1, 0, 0), tilt.y);
+        vm.Quaternion.axisAngle(
+          vm.Vector3(0, 0, 1),
+          -visualTilt.x * _visualTiltScale,
+        ) *
+        vm.Quaternion.axisAngle(
+          vm.Vector3(1, 0, 0),
+          visualTilt.y * _visualTiltScale,
+        );
 
     if (_isExiting && widget.simulation.marble.isActive) {
       // Retry respawns the simulation's marble, which ends the exit
@@ -372,12 +483,15 @@ class _BoardSceneViewState extends State<BoardSceneView>
 
   void _updateFallingMarble(Duration elapsed) {
     final fallStart = _fallStartElapsed;
-    if (fallStart == null) return;
+    final startPosition = _fallStartPosition;
+    if (fallStart == null || startPosition == null) return;
     final sinceFall = elapsed - fallStart;
 
     if (_sinkAnimation.isCompleteAt(sinceFall)) {
       widget.simulation.respawn();
       _fallStartElapsed = null;
+      _fallStartPosition = null;
+      _fallTargetCupCenter = null;
       widget.onMarbleRespawned();
       final respawned = widget.simulation.marble;
       _marbleNode
@@ -387,10 +501,23 @@ class _BoardSceneViewState extends State<BoardSceneView>
       return;
     }
 
+    // Rolls toward the hole's cup center in X/Z (or stays put for a
+    // LeftBoard fall, which has no cup) while dropping to the cup's bottom.
+    final target = _fallTargetCupCenter;
+    final progress = _sinkAnimation.progressAt(sinceFall);
+    final x = target == null
+        ? startPosition.x
+        : startPosition.x + (target.x - startPosition.x) * progress;
+    final z = target == null
+        ? startPosition.z
+        : startPosition.z + (target.z - startPosition.z) * progress;
     final marble = widget.simulation.marble;
-    final offset = vm.Vector3(0, _sinkAnimation.sinkOffsetAt(sinceFall), 0);
     _marbleNode
-      ..position = marble.position - offset
+      ..position = vm.Vector3(
+        x,
+        startPosition.y - _sinkAnimation.sinkOffsetAt(sinceFall),
+        z,
+      )
       ..rotation = marble.rotation
       ..scale = vm.Vector3.all(_sinkAnimation.scaleAt(sinceFall));
   }
@@ -435,4 +562,188 @@ class _BoardSceneViewState extends State<BoardSceneView>
       },
     );
   }
+}
+
+/// Builds one flat 1x1 world-UV floor quad centered at [center], facing
+/// `+Y`. See [_quadGeometry].
+MeshGeometry _worldUvQuad({required vm.Vector3 center, double halfSize = 0.5}) {
+  return _quadGeometry(
+    p00: vm.Vector3(center.x - halfSize, center.y, center.z - halfSize),
+    u: vm.Vector3(halfSize * 2, 0, 0),
+    v: vm.Vector3(0, 0, halfSize * 2),
+    normal: vm.Vector3(0, 1, 0),
+    uvOf: (p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile,
+  );
+}
+
+/// Builds a flat quad in the [p00], [p00]+[u], [p00]+[v], [p00]+[u]+[v]
+/// plane, with per-vertex UVs from [uvOf] and a single flat [normal].
+///
+/// Winds its two triangles the same way `flutter_scene`'s own
+/// `buildPlaneArrays` does for a `+Y`-facing quad spanned by `u` (its local
+/// X) and `v` (its local Z): `(p00, p00+v, p00+u)` then
+/// `(p00+u, p00+v, p00+u+v)`. Callers of this private helper are expected to
+/// pick `u` and `v` so that `cross(v, u)` equals the intended outward
+/// [normal]; getting that wrong only affects backface culling, which every
+/// caller here sidesteps by rendering with a `doubleSided` material.
+MeshGeometry _quadGeometry({
+  required vm.Vector3 p00,
+  required vm.Vector3 u,
+  required vm.Vector3 v,
+  required vm.Vector3 normal,
+  required vm.Vector2 Function(vm.Vector3 worldPosition) uvOf,
+}) {
+  final p10 = p00 + u;
+  final p01 = p00 + v;
+  final p11 = p00 + u + v;
+
+  final positions = <double>[];
+  final normals = <double>[];
+  final uvs = <double>[];
+  for (final p in [p00, p10, p01, p11]) {
+    positions.addAll([p.x, p.y, p.z]);
+    normals.addAll([normal.x, normal.y, normal.z]);
+    final uv = uvOf(p);
+    uvs.addAll([uv.x, uv.y]);
+  }
+
+  return MeshGeometry.fromArrays(
+    positions: Float32List.fromList(positions),
+    normals: Float32List.fromList(normals),
+    texCoords: Float32List.fromList(uvs),
+    indices: const [0, 2, 1, 1, 2, 3],
+  );
+}
+
+/// Builds a node carrying one world-UV-mapped box face mesh per visible
+/// side (the four side faces and the top; the bottom is never seen), for a
+/// wall segment centered at [center] with the given [halfExtents].
+Node _worldUvBoxNode({
+  required vm.Vector3 center,
+  required vm.Vector3 halfExtents,
+  required PhysicallyBasedMaterial material,
+}) {
+  final node = Node();
+  for (final geometry in _boxFaceGeometries(
+    center: center,
+    halfExtents: halfExtents,
+  )) {
+    node.addComponent(MeshComponent(Mesh(geometry, material)));
+  }
+  return node;
+}
+
+/// The top and four side face geometries of a box, each with world-UV
+/// texture coordinates projected onto that face's own plane, so the wood
+/// grain reads continuously across a wall's length instead of stretching
+/// end-to-end.
+Iterable<MeshGeometry> _boxFaceGeometries({
+  required vm.Vector3 center,
+  required vm.Vector3 halfExtents,
+}) sync* {
+  final hx = halfExtents.x;
+  final hy = halfExtents.y;
+  final hz = halfExtents.z;
+
+  vm.Vector2 xz(vm.Vector3 p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile;
+  vm.Vector2 zy(vm.Vector3 p) => vm.Vector2(p.z, p.y) / _woodUvUnitsPerTile;
+  vm.Vector2 xy(vm.Vector3 p) => vm.Vector2(p.x, p.y) / _woodUvUnitsPerTile;
+
+  // Top (+Y).
+  yield _quadGeometry(
+    p00: vm.Vector3(center.x - hx, center.y + hy, center.z - hz),
+    u: vm.Vector3(2 * hx, 0, 0),
+    v: vm.Vector3(0, 0, 2 * hz),
+    normal: vm.Vector3(0, 1, 0),
+    uvOf: xz,
+  );
+  // +X.
+  yield _quadGeometry(
+    p00: vm.Vector3(center.x + hx, center.y - hy, center.z - hz),
+    u: vm.Vector3(0, 0, 2 * hz),
+    v: vm.Vector3(0, 2 * hy, 0),
+    normal: vm.Vector3(1, 0, 0),
+    uvOf: zy,
+  );
+  // -X.
+  yield _quadGeometry(
+    p00: vm.Vector3(center.x - hx, center.y - hy, center.z - hz),
+    u: vm.Vector3(0, 2 * hy, 0),
+    v: vm.Vector3(0, 0, 2 * hz),
+    normal: vm.Vector3(-1, 0, 0),
+    uvOf: zy,
+  );
+  // +Z.
+  yield _quadGeometry(
+    p00: vm.Vector3(center.x - hx, center.y - hy, center.z + hz),
+    u: vm.Vector3(0, 2 * hy, 0),
+    v: vm.Vector3(2 * hx, 0, 0),
+    normal: vm.Vector3(0, 0, 1),
+    uvOf: xy,
+  );
+  // -Z.
+  yield _quadGeometry(
+    p00: vm.Vector3(center.x - hx, center.y - hy, center.z - hz),
+    u: vm.Vector3(2 * hx, 0, 0),
+    v: vm.Vector3(0, 2 * hy, 0),
+    normal: vm.Vector3(0, 0, -1),
+    uvOf: xy,
+  );
+}
+
+/// Builds a flat, world-UV annulus centered at [center]: a round opening of
+/// [innerRadius] cut out of an otherwise square (of half-size [halfSize])
+/// floor cell, so a hole's or the exit's cup shows through a real gap in
+/// the floor instead of the marble rolling over a flat, painted-on circle.
+///
+/// [segments] divides the ring; the outer boundary follows the square cell
+/// edge at each segment's angle rather than a circle, so adjacent opening
+/// and non-opening tiles still meet edge-to-edge with no gap.
+MeshGeometry _worldUvAnnulus({
+  required vm.Vector3 center,
+  required double innerRadius,
+  double halfSize = 0.5,
+  int segments = 24,
+}) {
+  final positions = <double>[];
+  final normals = <double>[];
+  final uvs = <double>[];
+  final indices = <int>[];
+
+  for (var i = 0; i < segments; i++) {
+    final angle = 2 * math.pi * i / segments;
+    final cos = math.cos(angle);
+    final sin = math.sin(angle);
+    final outerT = halfSize / math.max(cos.abs(), sin.abs());
+
+    final innerX = center.x + cos * innerRadius;
+    final innerZ = center.z + sin * innerRadius;
+    final outerX = center.x + cos * outerT;
+    final outerZ = center.z + sin * outerT;
+
+    positions.addAll([innerX, center.y, innerZ, outerX, center.y, outerZ]);
+    normals.addAll([0, 1, 0, 0, 1, 0]);
+    uvs.addAll([
+      innerX / _woodUvUnitsPerTile,
+      innerZ / _woodUvUnitsPerTile,
+      outerX / _woodUvUnitsPerTile,
+      outerZ / _woodUvUnitsPerTile,
+    ]);
+  }
+
+  for (var i = 0; i < segments; i++) {
+    final inner0 = i * 2;
+    final outer0 = i * 2 + 1;
+    final next = (i + 1) % segments;
+    final inner1 = next * 2;
+    final outer1 = next * 2 + 1;
+    indices.addAll([inner0, outer0, inner1, inner1, outer0, outer1]);
+  }
+
+  return MeshGeometry.fromArrays(
+    positions: Float32List.fromList(positions),
+    normals: Float32List.fromList(normals),
+    texCoords: Float32List.fromList(uvs),
+    indices: indices,
+  );
 }

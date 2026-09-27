@@ -7,14 +7,14 @@ void main() {
   group('HapticsDecider', () {
     const decider = HapticsDecider();
 
-    test('a fast HitWall gets a light impact', () {
+    test('a fast HitWall gets a medium impact', () {
       final impact = decider.decide(const HitWall(5), Duration.zero);
 
-      expect(impact, HapticImpact.light);
+      expect(impact, HapticImpact.medium);
     });
 
     test('a HitWall below the speed threshold gets no impact', () {
-      final impact = decider.decide(const HitWall(1), Duration.zero);
+      final impact = decider.decide(const HitWall(0.5), Duration.zero);
 
       expect(impact, HapticImpact.none);
     });
@@ -39,28 +39,28 @@ void main() {
         lastWallHitImpactElapsed: const Duration(milliseconds: 20),
       );
 
-      expect(impact, HapticImpact.light);
+      expect(impact, HapticImpact.medium);
     });
 
-    test('FellInHole gets a medium impact', () {
+    test('FellInHole gets a heavy impact', () {
       final impact = decider.decide(
         const FellInHole(GridPoint(column: 0, row: 0)),
         Duration.zero,
       );
 
-      expect(impact, HapticImpact.medium);
+      expect(impact, HapticImpact.heavy);
     });
 
-    test('LeftBoard gets a medium impact', () {
+    test('LeftBoard gets a heavy impact', () {
       final impact = decider.decide(const LeftBoard(), Duration.zero);
 
-      expect(impact, HapticImpact.medium);
+      expect(impact, HapticImpact.heavy);
     });
 
-    test('ReachedExit gets no impact', () {
+    test('ReachedExit gets a heavy impact', () {
       final impact = decider.decide(const ReachedExit(), Duration.zero);
 
-      expect(impact, HapticImpact.none);
+      expect(impact, HapticImpact.heavy);
     });
   });
 }

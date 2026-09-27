@@ -9,3 +9,5 @@
 
 Used as the image-based lighting environment map for the level play scene
 (`BoardSceneView`).
+
+See `../textures/ASSETS.md` for the wood and marble textures.

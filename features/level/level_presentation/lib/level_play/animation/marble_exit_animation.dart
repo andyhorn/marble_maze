@@ -15,14 +15,16 @@ class MarbleExitAnimation {
   /// Creates an exit animation with the given [duration] and [depth].
   const new({
     this.duration = const Duration(milliseconds: 600),
-    this.depth = 0.25,
+    this.depth = 0.5,
   });
 
   /// How long the animation takes to complete.
   final Duration duration;
 
   /// How far, in world units, the marble sinks into the exit cup over the
-  /// course of the animation.
+  /// course of the animation. Matches the exit cup's visual depth
+  /// (`BoardSceneView`'s cup geometry), so the marble comes to rest exactly
+  /// at the cup's bottom instead of floating above it or clipping through.
   final double depth;
 
   /// Whether the animation has finished by [elapsed] (time since it

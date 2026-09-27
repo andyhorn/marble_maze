@@ -6,11 +6,12 @@ enum HapticImpact {
   /// No haptic feedback for this event.
   none,
 
-  /// A light tap, for a hard wall hit.
-  light,
-
-  /// A stronger tap, for falling into a hole or leaving the board.
+  /// A medium tap, for a hard wall hit.
   medium,
+
+  /// A strong tap, for falling into a hole, leaving the board, or reaching
+  /// the exit.
+  heavy,
 }
 
 /// Decides which [HapticImpact] a [SimulationEvent] deserves, kept as a pure
@@ -22,12 +23,13 @@ enum HapticImpact {
 class HapticsDecider {
   /// Creates a haptics decider with the given tuning.
   const new({
-    this.wallHitMinSpeed = 3,
+    this.wallHitMinSpeed = 1,
     this.wallHitDebounce = const Duration(milliseconds: 150),
   });
 
-  /// The minimum [HitWall] speed, in units per second, for a light impact.
-  /// Below this, the marble only grazed the wall.
+  /// The minimum [HitWall] speed, in units per second, for a medium impact.
+  /// Below this, the marble only grazed the wall. Low enough that an
+  /// ordinary hard hit at the board's maximum 15-degree tilt registers.
   final double wallHitMinSpeed;
 
   /// The minimum time since the last wall-hit impact before another one is
@@ -49,11 +51,11 @@ class HapticsDecider {
         if (last != null && elapsed - last < wallHitDebounce) {
           return HapticImpact.none;
         }
-        return HapticImpact.light;
-      case FellInHole() || LeftBoard():
         return HapticImpact.medium;
+      case FellInHole() || LeftBoard():
+        return HapticImpact.heavy;
       case ReachedExit():
-        return HapticImpact.none;
+        return HapticImpact.heavy;
     }
   }
 }
