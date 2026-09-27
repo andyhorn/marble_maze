@@ -141,12 +141,12 @@ void runMarbleSimulationContractTests(
       expect(harness.simulation.marble.position.x, greaterThan(startX));
     });
 
-    test('tilt forward moves the marble toward -Z', () {
+    test('tilt forward moves the marble toward +Z', () {
       final startZ = harness.simulation.marble.position.z;
 
       _stepFor(harness.simulation, Tilt(x: 0, y: _rollTilt), _rollTime);
 
-      expect(harness.simulation.marble.position.z, lessThan(startZ));
+      expect(harness.simulation.marble.position.z, greaterThan(startZ));
     });
 
     test('a resting marble on a flat board stays at rest', () {

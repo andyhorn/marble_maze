@@ -318,7 +318,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     return Vector3(
       g * math.sin(tilt.x),
       -g * math.cos(tilt.x) * math.cos(tilt.y),
-      -g * math.sin(tilt.y),
+      g * math.sin(tilt.y),
     );
   }
 

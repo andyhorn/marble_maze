@@ -301,7 +301,7 @@ class _BoardSceneViewState extends State<BoardSceneView>
 
     _boardRoot.rotation =
         vm.Quaternion.axisAngle(vm.Vector3(0, 0, 1), -tilt.x) *
-        vm.Quaternion.axisAngle(vm.Vector3(1, 0, 0), -tilt.y);
+        vm.Quaternion.axisAngle(vm.Vector3(1, 0, 0), tilt.y);
 
     if (_isExiting && widget.simulation.marble.isActive) {
       // Retry respawns the simulation's marble, which ends the exit

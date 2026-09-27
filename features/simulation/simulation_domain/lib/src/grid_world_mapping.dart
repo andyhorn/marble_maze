@@ -7,7 +7,7 @@ import 'package:vector_math/vector_math.dart';
 ///
 /// 1 cell = 1 world unit; the board is centered on the origin in the X/Z
 /// plane, with Y up. Row 0 (the far edge of the grid) maps to the most
-/// negative Z; column 0 maps to the most negative X. [column] and [row] may
+/// positive Z; column 0 maps to the most negative X. [column] and [row] may
 /// be fractional, to place geometry spanning more than one cell.
 Vector3 gridCellCenter(
   num column,
@@ -16,7 +16,7 @@ Vector3 gridCellCenter(
   required int height,
 }) {
   final x = column - (width - 1) / 2;
-  final z = row - (height - 1) / 2;
+  final z = (height - 1) / 2 - row;
   return Vector3(x, 0, z);
 }
 

@@ -11,11 +11,11 @@ void main() {
       expect(center.z, 0);
     });
 
-    test('row 0 is the most negative Z (the far edge)', () {
+    test('row 0 is the most positive Z (the far edge)', () {
       final farEdge = gridCellCenter(0, 0, width: 9, height: 9);
       final nearEdge = gridCellCenter(0, 8, width: 9, height: 9);
 
-      expect(farEdge.z, lessThan(nearEdge.z));
+      expect(farEdge.z, greaterThan(nearEdge.z));
     });
 
     test('column 0 is the most negative X', () {

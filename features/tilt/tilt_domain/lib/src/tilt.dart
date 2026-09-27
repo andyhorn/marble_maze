@@ -5,7 +5,7 @@ import 'package:meta/meta.dart';
 /// The board's tilt, in radians around the X and Z screen axes.
 ///
 /// Positive [x] rolls the marble toward +X (screen right). Positive [y]
-/// tilts the far edge of the board down, rolling the marble toward -Z
+/// tilts the far edge of the board down, rolling the marble toward +Z
 /// (screen up).
 @immutable
 class Tilt {
