@@ -1,10 +1,15 @@
 import 'dart:async';
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
+import 'package:flutter/services.dart' show HapticFeedback;
 import 'package:flutter_scene/scene.dart';
 import 'package:level_domain/level_domain.dart';
+import 'package:level_presentation/level_play/animation/marble_exit_animation.dart';
 import 'package:level_presentation/level_play/animation/marble_sink_animation.dart';
+import 'package:level_presentation/level_play/camera/board_camera.dart';
+import 'package:level_presentation/level_play/haptics/haptics_decider.dart';
 import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:simulation_domain/simulation_domain.dart';
@@ -13,6 +18,20 @@ import 'package:vector_math/vector_math.dart' as vm;
 /// The sink animation played when the marble falls into a hole or leaves
 /// the board.
 const _sinkAnimation = MarbleSinkAnimation();
+
+/// The settle animation played when the marble reaches the exit.
+const _exitAnimation = MarbleExitAnimation();
+
+/// The camera's fitting, follow, and smoothing maths.
+const _boardCamera = BoardCamera();
+
+/// Tuning for the wall-hit and hole-fall haptic taps.
+const _hapticsDecider = HapticsDecider();
+
+/// The bundled HDR environment map used for image-based lighting. See
+/// `assets/hdr/ASSETS.md` for its source and licence.
+const _environmentAsset =
+    'packages/level_presentation/assets/hdr/studio_small_03_1k.hdr';
 
 /// Renders the board and marble with flutter_scene, and drives the frame
 /// loop: reads the current tilt from [controller], steps [simulation], and
@@ -74,13 +93,20 @@ class _BoardSceneViewState extends State<BoardSceneView>
   final Scene _scene = Scene();
   final Node _boardRoot = Node();
   late final Node _marbleNode;
+  late final PerspectiveCamera _camera;
   Ticker? _ticker;
   StreamSubscription<SimulationEvent>? _eventsSubscription;
   Duration _lastElapsed = Duration.zero;
   Duration? _fallStartElapsed;
+  Duration? _exitStartElapsed;
+  vm.Vector3? _exitStartPosition;
+  Duration? _lastWallHitImpactElapsed;
+  double _cameraZ = 0;
+  double _viewportAspectRatio = 16 / 9;
   bool _ready = false;
 
   bool get _isFalling => _fallStartElapsed != null;
+  bool get _isExiting => _exitStartElapsed != null;
 
   @override
   void initState() {
@@ -91,15 +117,35 @@ class _BoardSceneViewState extends State<BoardSceneView>
   }
 
   void _onSimulationEvent(SimulationEvent event) {
+    _handleHaptics(event);
     if (_isFalling) return;
     switch (event) {
       case FellInHole() || LeftBoard():
         _fallStartElapsed = _lastElapsed;
         widget.onMarbleFell();
       case ReachedExit():
+        _exitStartElapsed = _lastElapsed;
+        _exitStartPosition = widget.simulation.marble.position.clone();
         widget.onReachedExit();
       case HitWall():
         break;
+    }
+  }
+
+  void _handleHaptics(SimulationEvent event) {
+    final impact = _hapticsDecider.decide(
+      event,
+      _lastElapsed,
+      lastWallHitImpactElapsed: _lastWallHitImpactElapsed,
+    );
+    switch (impact) {
+      case HapticImpact.none:
+        return;
+      case HapticImpact.light:
+        _lastWallHitImpactElapsed = _lastElapsed;
+        unawaited(HapticFeedback.lightImpact());
+      case HapticImpact.medium:
+        unawaited(HapticFeedback.mediumImpact());
     }
   }
 
@@ -113,18 +159,37 @@ class _BoardSceneViewState extends State<BoardSceneView>
       mesh: Mesh(
         SphereGeometry(radius: kMarbleRadius),
         PhysicallyBasedMaterial()
-          ..metallicFactor = 0.9
-          ..roughnessFactor = 0.2,
+          ..metallicFactor = 1
+          ..roughnessFactor = 0.12,
       ),
+    );
+    _camera = PerspectiveCamera(
+      position: vm.Vector3(0, 8, -6),
+      target: vm.Vector3(0, 0, 0),
     );
     _scene
       ..add(_boardRoot)
-      ..add(_marbleNode);
+      ..add(_marbleNode)
+      ..directionalLight = DirectionalLight(
+        direction: vm.Vector3(-0.4, -1, 0.5),
+        castsShadow: true,
+      )
+      ..postProcess.bloom.enabled = true
+      ..postProcess.bloom.intensity = 0.08;
+    unawaited(_scene.loadEnvironment(_environmentAsset));
 
     if (!mounted) return;
     setState(() => _ready = true);
     _ticker = createTicker(_onTick)..start();
   }
+
+  static const Color _woodColor = Colors.brown;
+  static const Color _cupColor = Color(0xFF141414);
+  static const Color _exitCupColor = Colors.amber;
+
+  static PhysicallyBasedMaterial _woodMaterial() => PhysicallyBasedMaterial()
+    ..baseColorFactor = _colorToVector4(_woodColor)
+    ..roughnessFactor = 0.75;
 
   void _buildBoard() {
     final level = widget.level;
@@ -133,7 +198,7 @@ class _BoardSceneViewState extends State<BoardSceneView>
         CuboidGeometry(
           vm.Vector3(level.width.toDouble(), 0.2, level.height.toDouble()),
         ),
-        PhysicallyBasedMaterial()..roughnessFactor = 0.8,
+        _woodMaterial(),
       ),
     )..position = vm.Vector3(0, -0.1, 0);
     _boardRoot.add(floor);
@@ -150,7 +215,7 @@ class _BoardSceneViewState extends State<BoardSceneView>
                 CuboidGeometry(
                   vm.Vector3(placement.halfLength * 2, kWallHeight, 1),
                 ),
-                PhysicallyBasedMaterial()..roughnessFactor = 0.6,
+                _woodMaterial(),
               ),
             )
             ..position = vm.Vector3(
@@ -163,28 +228,31 @@ class _BoardSceneViewState extends State<BoardSceneView>
 
     for (final hole in level.holes) {
       _boardRoot.add(
-        _buildFloorMarker(hole, radius: kHoleRadius, level: level),
+        _buildCup(hole, radius: kHoleRadius, level: level, color: _cupColor),
       );
     }
     _boardRoot.add(
-      _buildFloorMarker(
+      _buildCup(
         level.exit,
         radius: kExitRadius,
         level: level,
-        color: Colors.amber,
+        color: _exitCupColor,
       ),
     );
   }
 
-  static const _holeMarkerColor = Color(0xFF141414);
+  static vm.Vector4 _colorToVector4(Color color) =>
+      vm.Vector4(color.r, color.g, color.b, color.a);
 
-  // A thin disc set into the floor: proper cups and materials come in #10,
-  // this is only so the player can see where holes and the exit are.
-  Node _buildFloorMarker(
+  /// A short, dark cylinder standing in for a cup set into the floor: the
+  /// floor is a single solid box with its top surface at world Y 0, so a
+  /// collider actually recessed below it would be hidden inside the floor
+  /// mesh. This sits flush with the floor instead of visibly recessed.
+  Node _buildCup(
     GridPoint point, {
     required double radius,
     required Level level,
-    Color color = _holeMarkerColor,
+    required Color color,
   }) {
     final center = gridPointCenter(
       point,
@@ -193,12 +261,13 @@ class _BoardSceneViewState extends State<BoardSceneView>
     );
     return Node(
       mesh: Mesh(
-        CylinderGeometry(bottomRadius: radius, topRadius: radius, height: 0.02),
+        CylinderGeometry(bottomRadius: radius, topRadius: radius, height: 0.04),
         PhysicallyBasedMaterial()
-          ..baseColorFactor = vm.Vector4(color.r, color.g, color.b, color.a)
-          ..roughnessFactor = 0.9,
+          ..baseColorFactor = _colorToVector4(color)
+          ..metallicFactor = 0
+          ..roughnessFactor = 0.85,
       ),
-    )..position = vm.Vector3(center.x, 0.01, center.z);
+    )..position = vm.Vector3(center.x, 0.02, center.z);
   }
 
   void _onTick(Duration elapsed) {
@@ -220,7 +289,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
         vm.Quaternion.axisAngle(vm.Vector3(0, 0, 1), -tilt.x) *
         vm.Quaternion.axisAngle(vm.Vector3(1, 0, 0), -tilt.y);
 
-    if (_isFalling) {
+    if (_isExiting) {
+      _updateExitingMarble(elapsed);
+    } else if (_isFalling) {
       _updateFallingMarble(elapsed);
     } else {
       final marble = widget.simulation.marble;
@@ -229,6 +300,53 @@ class _BoardSceneViewState extends State<BoardSceneView>
         ..rotation = marble.rotation
         ..scale = vm.Vector3.all(1);
     }
+    _updateCamera(delta);
+  }
+
+  void _updateExitingMarble(Duration elapsed) {
+    final exitStart = _exitStartElapsed;
+    final startPosition = _exitStartPosition;
+    if (exitStart == null || startPosition == null) return;
+    final sinceExit = elapsed - exitStart;
+
+    final level = widget.level;
+    final cupCenter = gridPointCenter(
+      level.exit,
+      width: level.width,
+      height: level.height,
+    );
+    final progress = _exitAnimation.progressAt(sinceExit);
+    final settled = vm.Vector3(
+      startPosition.x + (cupCenter.x - startPosition.x) * progress,
+      startPosition.y - _exitAnimation.sinkOffsetAt(sinceExit),
+      startPosition.z + (cupCenter.z - startPosition.z) * progress,
+    );
+    _marbleNode.position = settled;
+  }
+
+  /// Advances the camera's Z target toward the marble (or the exit cup,
+  /// once won) and toward the board's center on a level that fits on
+  /// screen, smoothing frame-rate independently.
+  void _updateCamera(Duration delta) {
+    final level = widget.level;
+    final marbleZ = widget.simulation.marble.position.z;
+    final targetZ = _boardCamera.targetZFor(
+      marbleZ: marbleZ,
+      boardWidth: level.width.toDouble(),
+      boardHeight: level.height.toDouble(),
+      viewportAspectRatio: _viewportAspectRatio,
+    );
+    _cameraZ = _boardCamera.smoothTowards(_cameraZ, targetZ, delta);
+
+    final distance = _boardCamera.distanceToFit(
+      level.width.toDouble(),
+      _viewportAspectRatio,
+    );
+    final horizontalOffset = distance * math.cos(_boardCamera.pitchRadians);
+    final verticalOffset = distance * math.sin(_boardCamera.pitchRadians);
+    _camera
+      ..position = vm.Vector3(0, verticalOffset, _cameraZ - horizontalOffset)
+      ..target = vm.Vector3(0, 0, _cameraZ);
   }
 
   void _updateFallingMarble(Duration elapsed) {
@@ -280,19 +398,20 @@ class _BoardSceneViewState extends State<BoardSceneView>
   @override
   Widget build(BuildContext context) {
     if (!_ready) return const SizedBox.expand();
-    return GestureDetector(
-      dragStartBehavior: DragStartBehavior.down,
-      onPanStart: _onPanStart,
-      onPanUpdate: _onPanUpdate,
-      onPanEnd: _onPanEnd,
-      onPanCancel: _onPanCancel,
-      child: SceneView(
-        _scene,
-        camera: PerspectiveCamera(
-          position: vm.Vector3(0, 8, -6),
-          target: vm.Vector3(0, 0, 0),
-        ),
-      ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        if (constraints.maxHeight > 0) {
+          _viewportAspectRatio = constraints.maxWidth / constraints.maxHeight;
+        }
+        return GestureDetector(
+          dragStartBehavior: DragStartBehavior.down,
+          onPanStart: _onPanStart,
+          onPanUpdate: _onPanUpdate,
+          onPanEnd: _onPanEnd,
+          onPanCancel: _onPanCancel,
+          child: SceneView(_scene, camera: _camera),
+        );
+      },
     );
   }
 }

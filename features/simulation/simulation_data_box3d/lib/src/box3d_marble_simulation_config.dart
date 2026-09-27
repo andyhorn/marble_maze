@@ -16,6 +16,7 @@ class Box3dMarbleSimulationConfig {
     this.fixedTimestepSeconds = 1 / 120,
     this.maxStepElapsed = const Duration(milliseconds: 100),
     this.maxSpeed = 12,
+    this.hitWallMinSpeed = 0.5,
   });
 
   /// The default tuning.
@@ -60,4 +61,9 @@ class Box3dMarbleSimulationConfig {
   /// The marble's maximum speed, in units per second. Clamped every fixed
   /// step.
   final double maxSpeed;
+
+  /// The minimum approach speed, in units per second, for a wall contact to
+  /// emit [HitWall]. Below this, resting or slow-rolling contact against a
+  /// wall (or the floor) never emits an event.
+  final double hitWallMinSpeed;
 }

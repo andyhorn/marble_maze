@@ -44,6 +44,10 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
   /// The exit sensor shape's handle, once loaded.
   int? _exitSensorHandle;
 
+  /// The interior wall and outer border shape handles, so a contact can be
+  /// told apart from a floor contact (which never emits [HitWall]).
+  final _wallShapeHandles = <int>{};
+
   final _eventsController = StreamController<SimulationEvent>.broadcast();
 
   @override
@@ -54,6 +58,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _frozen = false;
     _holeSensors.clear();
     _exitSensorHandle = null;
+    _wallShapeHandles.clear();
 
     final world = Box3dWorld(gravity: Vector3(0, -config.gravityMagnitude, 0));
     _world = world;
@@ -79,7 +84,8 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       ..angularDamping = config.angularDamping
       ..sleepEnabled = false;
     final marbleShape = marble.addSphere(config.marbleRadius)
-      ..sensorEventsEnabled = true;
+      ..sensorEventsEnabled = true
+      ..contactEventsEnabled = true;
     _marbleBody = marble;
     _marbleShapeHandle = marbleShape.handle;
   }
@@ -154,9 +160,12 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       config.wallHeight / 2,
       placement.center.z,
     );
-    world
-        .createBody(type: Box3dBodyType.static_, position: position)
-        .addBox(halfExtents);
+    final shape =
+        world
+            .createBody(type: Box3dBodyType.static_, position: position)
+            .addBox(halfExtents)
+          ..contactEventsEnabled = true;
+    _wallShapeHandles.add(shape.handle);
   }
 
   void _buildBorder(Box3dWorld world, Level level) {
@@ -166,9 +175,12 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     final halfThickness = config.wallThickness / 2;
 
     void addBorderBox(Vector3 center, Vector3 halfExtents) {
-      world
-          .createBody(type: Box3dBodyType.static_, position: center)
-          .addBox(halfExtents);
+      final shape =
+          world
+              .createBody(type: Box3dBodyType.static_, position: center)
+              .addBox(halfExtents)
+            ..contactEventsEnabled = true;
+      _wallShapeHandles.add(shape.handle);
     }
 
     addBorderBox(
@@ -208,6 +220,9 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
               .round(),
     );
     while (_accumulated >= timestep) {
+      // The solver zeroes the marble's velocity along a contact's normal
+      // during this step, so its approach speed has to be read beforehand.
+      final preStepVelocity = marble.linearVelocity.clone();
       world.step(config.fixedTimestepSeconds);
       _accumulated -= timestep;
 
@@ -220,10 +235,31 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
       _handleSensorEvents(stepEvents, marble);
       if (_frozen) continue;
 
+      _handleContactEvents(stepEvents, preStepVelocity);
+
       _checkBounds(marble);
       if (_frozen) continue;
 
       _clampSpeed(marble);
+    }
+  }
+
+  void _handleContactEvents(Box3dEvents stepEvents, Vector3 preStepVelocity) {
+    final marbleShape = _marbleShapeHandle;
+    if (marbleShape == null) return;
+    for (final began in stepEvents.contactBegan) {
+      final isMarbleShapeA = began.shapeA == marbleShape;
+      final isMarbleShapeB = began.shapeB == marbleShape;
+      if (!isMarbleShapeA && !isMarbleShapeB) continue;
+      final otherShape = isMarbleShapeA ? began.shapeB : began.shapeA;
+      if (!_wallShapeHandles.contains(otherShape)) continue;
+
+      final points = began.points;
+      final speed = points.isEmpty
+          ? preStepVelocity.length
+          : preStepVelocity.dot(points.first.normal).abs();
+      if (speed < config.hitWallMinSpeed) continue;
+      _eventsController.add(HitWall(speed));
     }
   }
 
@@ -335,6 +371,7 @@ class Box3dMarbleSimulation implements IMarbleSimulation, MarbleTestHandle {
     _marbleShapeHandle = null;
     _holeSensors.clear();
     _exitSensorHandle = null;
+    _wallShapeHandles.clear();
     unawaited(_eventsController.close());
   }
 
