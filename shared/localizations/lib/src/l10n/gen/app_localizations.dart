@@ -204,6 +204,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Drag to tilt'**
   String get levelPlayDragToTiltHint;
+
+  /// Tooltip and semantics label for the HUD's pause button
+  ///
+  /// In en, this message translates to:
+  /// **'Pause'**
+  String get levelPlayPause;
+
+  /// Title shown on the paused overlay
+  ///
+  /// In en, this message translates to:
+  /// **'Paused'**
+  String get levelPlayPausedTitle;
+
+  /// Button on the paused overlay that resumes the level
+  ///
+  /// In en, this message translates to:
+  /// **'Resume'**
+  String get levelPlayResume;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

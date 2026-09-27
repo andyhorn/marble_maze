@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:progress_domain/progress_domain.dart';
 
@@ -53,11 +54,37 @@ void main() {
         milliseconds: 320,
       );
 
-      await tester.pumpApp(LevelPlayHud(cubit: cubit, title: level.title));
+      await tester.pumpApp(
+        LevelPlayHud(cubit: cubit, title: level.title, onPause: () {}),
+      );
       await tester.pump();
 
       expect(find.text('First Roll'), findsOneWidget);
       expect(find.text('1:05.32'), findsOneWidget);
+    });
+
+    testWidgets('calls onPause when the pause button is tapped', (
+      tester,
+    ) async {
+      final cubit = LevelPlayCubit(
+        repository: repository,
+        progressRepository: progressRepository,
+        stopwatchFactory: () => stopwatch,
+      );
+      await cubit.load('first_roll');
+      cubit.start();
+      var paused = false;
+
+      await tester.pumpApp(
+        LevelPlayHud(
+          cubit: cubit,
+          title: level.title,
+          onPause: () => paused = true,
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.pause));
+
+      expect(paused, isTrue);
     });
   });
 }

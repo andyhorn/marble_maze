@@ -98,7 +98,9 @@ void main() {
           .thenAnswer((_) async => true);
     });
 
-    Widget buildSubject() {
+    Widget buildSubject({
+      BoardBuilder boardBuilder = _placeholderBoardBuilder,
+    }) {
       return MultiRepositoryProvider(
         providers: [
           RepositoryProvider<ILevelsRepository>.value(value: repository),
@@ -114,7 +116,7 @@ void main() {
           simulationFactory: () => simulation,
           onExitToLevels: () {},
           onNextLevel: (id) => nextLevelId = id,
-          boardBuilder: _placeholderBoardBuilder,
+          boardBuilder: boardBuilder,
         ),
       );
     }
@@ -202,6 +204,102 @@ void main() {
         await tester.pumpAndSettle();
 
         expect(nextLevelId, 'second_roll');
+      });
+    });
+
+    group('paused', () {
+      setUp(() {
+        when(() => repository.getLevel('first_roll'))
+            .thenAnswer((_) async => _level);
+      });
+
+      testWidgets(
+        'pause() passes isSimulationActive: false and shows the paused '
+        'overlay',
+        (tester) async {
+          bool? capturedIsActive;
+          Widget boardBuilder({
+            required Level level,
+            required IMarbleSimulation simulation,
+            required bool isSimulationActive,
+            required LevelPlayInputController controller,
+            required VoidCallback onMarbleFell,
+            required VoidCallback onMarbleRespawned,
+            required VoidCallback onReachedExit,
+          }) {
+            capturedIsActive = isSimulationActive;
+            return const Placeholder();
+          }
+
+          await tester.pumpApp(buildSubject(boardBuilder: boardBuilder));
+          await tester.pumpAndSettle();
+          final cubit =
+              tester
+                  .element(find.byType(LevelPlayReadyOverlay))
+                  .read<LevelPlayCubit>()
+                ..start();
+          await tester.pump();
+          capturedIsActive = null;
+
+          cubit.pause();
+          await tester.pump();
+
+          expect(capturedIsActive, isFalse);
+          expect(find.byType(LevelPlayPausedOverlay), findsOneWidget);
+        },
+      );
+
+      // handleAppLifecycleStateChanged asserts on realistic transitions (for
+      // example resumed must arrive by way of inactive), so every test
+      // leaves the binding's lifecycle state back at resumed once it is
+      // done, for other tests sharing the same binding.
+      Future<void> returnToResumed(WidgetTester tester) async {
+        // From paused, the valid path back to resumed passes through
+        // hidden and inactive in turn.
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.hidden);
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.inactive,
+        );
+        tester.binding.handleAppLifecycleStateChanged(
+          AppLifecycleState.resumed,
+        );
+        await tester.pump();
+      }
+
+      testWidgets('the app going to the background pauses the level', (
+        tester,
+      ) async {
+        addTearDown(() => returnToResumed(tester));
+        await tester.pumpApp(buildSubject());
+        await tester.pumpAndSettle();
+        final cubit =
+            tester
+                .element(find.byType(LevelPlayReadyOverlay))
+                .read<LevelPlayCubit>()
+              ..start();
+        await tester.pump();
+
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+
+        expect(cubit.state, isA<LevelPlayPaused>());
+      });
+
+      testWidgets('returning to the foreground does not auto-resume', (
+        tester,
+      ) async {
+        await tester.pumpApp(buildSubject());
+        await tester.pumpAndSettle();
+        final cubit =
+            tester
+                .element(find.byType(LevelPlayReadyOverlay))
+                .read<LevelPlayCubit>()
+              ..start();
+        await tester.pump();
+        tester.binding.handleAppLifecycleStateChanged(AppLifecycleState.paused);
+
+        await returnToResumed(tester);
+
+        expect(cubit.state, isA<LevelPlayPaused>());
       });
     });
   });

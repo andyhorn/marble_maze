@@ -12,6 +12,7 @@ class LevelPlayPlayingOverlay extends StatelessWidget {
     required this.cubit,
     required this.title,
     required this.controller,
+    required this.onPause,
     super.key,
   });
 
@@ -24,11 +25,14 @@ class LevelPlayPlayingOverlay extends StatelessWidget {
   /// The input controller whose hint visibility this overlay follows.
   final LevelPlayInputController controller;
 
+  /// Called when the player taps the HUD's pause button.
+  final VoidCallback onPause;
+
   @override
   Widget build(BuildContext context) {
     return Stack(
       children: [
-        LevelPlayHud(cubit: cubit, title: title),
+        LevelPlayHud(cubit: cubit, title: title, onPause: onPause),
         ListenableBuilder(
           listenable: controller,
           builder: (context, _) => controller.showHint

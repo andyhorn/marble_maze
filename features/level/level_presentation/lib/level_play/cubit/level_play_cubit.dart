@@ -5,8 +5,8 @@ import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/cubit/level_play_state.dart';
 import 'package:progress_domain/progress_domain.dart';
 
-/// Loads a level by id and drives it through ready, playing, falling, and
-/// won, exposing each step as a [LevelPlayState].
+/// Loads a level by id and drives it through ready, playing, falling,
+/// paused, and won, exposing each step as a [LevelPlayState].
 class LevelPlayCubit extends Cubit<LevelPlayState> {
   /// Creates a level play cubit over [repository] and [progressRepository].
   ///
@@ -97,6 +97,30 @@ class LevelPlayCubit extends Cubit<LevelPlayState> {
     if (current is! LevelPlayFalling) return;
     emit(LevelPlayPlaying(current.level));
   }
+
+  /// Moves from [LevelPlayPlaying] or [LevelPlayFalling] to [LevelPlayPaused]
+  /// and stops the timer. Ignored in any other state.
+  void pause() {
+    final current = state;
+    if (current is! LevelPlayPlaying && current is! LevelPlayFalling) return;
+    _stopwatch?.stop();
+    emit(LevelPlayPaused(level: _levelOf(current), resumeTo: current));
+  }
+
+  /// Moves from [LevelPlayPaused] back to the state it paused from and
+  /// restarts the timer. Ignored in any other state.
+  void resume() {
+    final current = state;
+    if (current is! LevelPlayPaused) return;
+    _stopwatch?.start();
+    emit(current.resumeTo);
+  }
+
+  Level _levelOf(LevelPlayState state) => switch (state) {
+    LevelPlayPlaying(:final level) => level,
+    LevelPlayFalling(:final level) => level,
+    _ => throw StateError('Unreachable: $state cannot be paused.'),
+  };
 
   /// Moves from [LevelPlayPlaying] to [LevelPlayWon] and stops the timer.
   /// Ignored in any other state, including [LevelPlayFalling].

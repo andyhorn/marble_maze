@@ -2,8 +2,6 @@ import 'package:level_domain/level_domain.dart';
 import 'package:meta/meta.dart';
 
 /// The level play screen's state.
-///
-/// Paused is added alongside the pause feature that produces it.
 @immutable
 sealed class LevelPlayState {
   const new();
@@ -64,6 +62,33 @@ class LevelPlayFalling extends LevelPlayState {
 
   @override
   int get hashCode => level.hashCode;
+}
+
+/// Paused, either by the pause button or automatically when the app goes to
+/// the background. [level] keeps the board on screen while paused, the same
+/// as [LevelPlayPlaying] and [LevelPlayFalling]. The timer is stopped.
+///
+/// [resumeTo] is the [LevelPlayPlaying] or [LevelPlayFalling] state this
+/// paused from, restored on resume.
+class LevelPlayPaused extends LevelPlayState {
+  /// Creates a paused state for [level], resuming to [resumeTo].
+  const new({required this.level, required this.resumeTo});
+
+  /// The loaded level.
+  final Level level;
+
+  /// The state to return to on resume: either [LevelPlayPlaying] or
+  /// [LevelPlayFalling].
+  final LevelPlayState resumeTo;
+
+  @override
+  bool operator ==(Object other) =>
+      other is LevelPlayPaused &&
+      other.level == level &&
+      other.resumeTo == resumeTo;
+
+  @override
+  int get hashCode => Object.hash(level, resumeTo);
 }
 
 /// The marble reached the exit. The timer has stopped at [time]; [par] is

@@ -8,6 +8,7 @@ import 'package:level_presentation/level_play/input/level_play_input_controller.
 import 'package:level_presentation/level_play/view/board_scene_view.dart';
 import 'package:level_presentation/level_play/view/level_play_error_view.dart';
 import 'package:level_presentation/level_play/view/level_play_loading_view.dart';
+import 'package:level_presentation/level_play/view/level_play_paused_overlay.dart';
 import 'package:level_presentation/level_play/view/level_play_playing_overlay.dart';
 import 'package:level_presentation/level_play/view/level_play_ready_overlay.dart';
 import 'package:level_presentation/level_play/view/level_play_view.dart';
@@ -109,6 +110,7 @@ class _LevelPlayModuleBody extends StatefulWidget {
 class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   IMarbleSimulation? _simulation;
   late final LevelPlayInputController _controller;
+  late final AppLifecycleListener _lifecycleListener;
 
   IMarbleSimulation get _simulationForPlay =>
       _simulation ??= widget.simulationFactory();
@@ -120,12 +122,30 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
       repository: context.read<ITiltRepository>(),
     );
     unawaited(_controller.initialize());
+    // Only pauses: the player must tap Resume, so returning to the
+    // foreground never restarts the timer or physics on its own.
+    _lifecycleListener = AppLifecycleListener(
+      onStateChange: _onAppLifecycleStateChanged,
+    );
+  }
+
+  void _onAppLifecycleStateChanged(AppLifecycleState state) {
+    switch (state) {
+      case AppLifecycleState.inactive:
+      case AppLifecycleState.hidden:
+      case AppLifecycleState.paused:
+        context.read<LevelPlayCubit>().pause();
+      case AppLifecycleState.resumed:
+      case AppLifecycleState.detached:
+        break;
+    }
   }
 
   @override
   void dispose() {
     _simulation?.dispose();
     _controller.dispose();
+    _lifecycleListener.dispose();
     super.dispose();
   }
 
@@ -177,6 +197,25 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             cubit: cubit,
             title: level.title,
             controller: _controller,
+            onPause: cubit.pause,
+          ),
+        ),
+        // Also builds a BoardSceneView, the same as Playing and Falling
+        // above, so its ticker and fall-in-progress state survive the
+        // pause: the board freezes rather than being torn down and rebuilt.
+        LevelPlayPaused(:final level) => LevelPlayView(
+          boardView: widget.boardBuilder(
+            level: level,
+            simulation: _simulationForPlay,
+            isSimulationActive: false,
+            controller: _controller,
+            onMarbleFell: cubit.marbleFell,
+            onMarbleRespawned: cubit.marbleRespawned,
+            onReachedExit: cubit.marbleReachedExit,
+          ),
+          overlay: LevelPlayPausedOverlay(
+            onResume: cubit.resume,
+            onBackToLevels: widget.onExitToLevels,
           ),
         ),
         LevelPlayWon(

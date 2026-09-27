@@ -91,5 +91,17 @@
     "levelPlayDragToTiltHint": "Drag to tilt",
     "@levelPlayDragToTiltHint": {
         "description": "One-time hint shown when the accelerometer is unavailable, so the player knows to drag the board instead"
+    },
+    "levelPlayPause": "Pause",
+    "@levelPlayPause": {
+        "description": "Tooltip and semantics label for the HUD's pause button"
+    },
+    "levelPlayPausedTitle": "Paused",
+    "@levelPlayPausedTitle": {
+        "description": "Title shown on the paused overlay"
+    },
+    "levelPlayResume": "Resume",
+    "@levelPlayResume": {
+        "description": "Button on the paused overlay that resumes the level"
     }
 }

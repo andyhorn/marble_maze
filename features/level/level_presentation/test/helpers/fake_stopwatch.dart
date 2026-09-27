@@ -17,6 +17,12 @@ class FakeStopwatch implements Stopwatch {
   @override
   void reset() => elapsed = Duration.zero;
 
+  /// Advances [elapsed] by [duration], but only while [isRunning], so tests
+  /// can assert that time paused between [stop] and [start] is excluded.
+  void advance(Duration duration) {
+    if (isRunning) elapsed += duration;
+  }
+
   @override
   int get elapsedMicroseconds => elapsed.inMicroseconds;
 

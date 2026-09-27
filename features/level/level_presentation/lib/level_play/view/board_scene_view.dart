@@ -6,6 +6,7 @@ import 'package:flutter_scene/scene.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/animation/marble_sink_animation.dart';
 import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
+import 'package:level_presentation/level_play/view/frame_clock.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:simulation_domain/simulation_domain.dart';
 import 'package:vector_math/vector_math.dart' as vm;
@@ -51,7 +52,8 @@ class BoardSceneView extends StatefulWidget {
   final IMarbleSimulation simulation;
 
   /// Whether [simulation] advances each frame. False while the marble sits
-  /// still at the start (before the tap to start, and once it has won).
+  /// still at the start (before the tap to start, and once it has won), and
+  /// while paused, which also freezes the sink animation.
   final bool isSimulationActive;
 
   /// Called when the marble falls into a hole or leaves the board, before
@@ -76,9 +78,14 @@ class _BoardSceneViewState extends State<BoardSceneView>
   late final Node _marbleNode;
   Ticker? _ticker;
   StreamSubscription<SimulationEvent>? _eventsSubscription;
-  Duration _lastElapsed = Duration.zero;
+  final FrameClock _frameClock = FrameClock();
   Duration? _fallStartElapsed;
   bool _ready = false;
+
+  // An alias so the fall-start timestamp below reads (and freezes while
+  // paused) from the clock's active-only elapsed time, rather than
+  // wall-clock ticker time.
+  Duration get _lastElapsed => _frameClock.activeElapsed;
 
   bool get _isFalling => _fallStartElapsed != null;
 
@@ -202,17 +209,22 @@ class _BoardSceneViewState extends State<BoardSceneView>
   }
 
   void _onTick(Duration elapsed) {
-    final delta = elapsed - _lastElapsed;
-    _lastElapsed = elapsed;
+    // Clamped so a stalled frame (for example while the app was
+    // backgrounded, or while paused) does not dump a burst of physics or
+    // animation on the next active frame; frozen while inactive so the
+    // sink animation freezes and resumes from where it left off.
+    final delta = _frameClock.tick(
+      elapsed,
+      isActive: widget.isSimulationActive,
+    );
 
     widget.controller.update(delta);
     final tilt = widget.controller.tilt;
 
-    // Stepped unconditionally while falling: the marble is frozen at that
-    // point, so stepping it is harmless. Not stepped while
-    // [BoardSceneView.isSimulationActive] is false (Ready and Won): the
-    // marble sits still at rest rather than settling under gravity.
-    if (widget.isSimulationActive || _isFalling) {
+    // Not stepped while [BoardSceneView.isSimulationActive] is false
+    // (Ready, Won, and Paused): the marble sits still at rest rather than
+    // settling under gravity, and physics stays frozen while paused.
+    if (widget.isSimulationActive) {
       widget.simulation.step(tilt, delta);
     }
 
@@ -221,7 +233,7 @@ class _BoardSceneViewState extends State<BoardSceneView>
         vm.Quaternion.axisAngle(vm.Vector3(1, 0, 0), -tilt.y);
 
     if (_isFalling) {
-      _updateFallingMarble(elapsed);
+      _updateFallingMarble(_frameClock.activeElapsed);
     } else {
       final marble = widget.simulation.marble;
       _marbleNode

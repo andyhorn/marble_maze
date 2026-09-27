@@ -72,4 +72,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get levelPlayDragToTiltHint => 'Arrastra para inclinar';
+
+  @override
+  String get levelPlayPause => 'Pausa';
+
+  @override
+  String get levelPlayPausedTitle => 'En pausa';
+
+  @override
+  String get levelPlayResume => 'Reanudar';
 }

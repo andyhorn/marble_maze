@@ -1,6 +1,7 @@
 import 'package:flutter_test/flutter_test.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
+import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:progress_domain/progress_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
@@ -61,6 +62,7 @@ void main() {
           cubit: cubit,
           title: 'First Roll',
           controller: controller,
+          onPause: () {},
         ),
       );
 
@@ -80,6 +82,7 @@ void main() {
           cubit: cubit,
           title: 'First Roll',
           controller: controller,
+          onPause: () {},
         ),
       );
 
@@ -98,12 +101,35 @@ void main() {
           cubit: cubit,
           title: 'First Roll',
           controller: controller,
+          onPause: () {},
         ),
       );
       controller.dragStart(0, 0);
       await tester.pump();
 
       expect(find.byType(LevelPlayTiltHint), findsNothing);
+    });
+
+    testWidgets('calls onPause when the pause button is tapped', (
+      tester,
+    ) async {
+      final repository = _FakeTiltRepository()..isAvailableResult = false;
+      controller = LevelPlayInputController(repository: repository);
+      await controller.initialize();
+      var paused = false;
+
+      await tester.pumpApp(
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () => paused = true,
+        ),
+      );
+      await tester.tap(find.byIcon(Icons.pause));
+
+      expect(paused, isTrue);
+      controller.dispose();
     });
   });
 }

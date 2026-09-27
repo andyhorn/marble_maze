@@ -91,5 +91,17 @@
     "levelPlayDragToTiltHint": "Arrastra para inclinar",
     "@levelPlayDragToTiltHint": {
         "description": "Sugerencia única que se muestra cuando el acelerómetro no está disponible, para que el jugador sepa que debe arrastrar el tablero"
+    },
+    "levelPlayPause": "Pausa",
+    "@levelPlayPause": {
+        "description": "Texto de ayuda y etiqueta de accesibilidad del botón de pausa del HUD"
+    },
+    "levelPlayPausedTitle": "En pausa",
+    "@levelPlayPausedTitle": {
+        "description": "Título que se muestra en la pantalla de pausa"
+    },
+    "levelPlayResume": "Reanudar",
+    "@levelPlayResume": {
+        "description": "Botón de la pantalla de pausa que reanuda el nivel"
     }
 }

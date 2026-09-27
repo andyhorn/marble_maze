@@ -194,6 +194,88 @@ void main() {
     );
 
     blocTest<LevelPlayCubit, LevelPlayState>(
+      'pause() moves from playing to paused and stops the timer',
+      seed: () => const LevelPlayReady(level),
+      build: build,
+      act: (cubit) {
+        cubit
+          ..start()
+          ..pause();
+      },
+      expect: () => [
+        const LevelPlayPlaying(level),
+        const LevelPlayPaused(level: level, resumeTo: LevelPlayPlaying(level)),
+      ],
+      verify: (_) => expect(stopwatch.isRunning, isFalse),
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'resume() moves from paused back to playing and restarts the timer',
+      seed: () => const LevelPlayReady(level),
+      build: build,
+      act: (cubit) {
+        cubit
+          ..start()
+          ..pause()
+          ..resume();
+      },
+      expect: () => [
+        const LevelPlayPlaying(level),
+        const LevelPlayPaused(level: level, resumeTo: LevelPlayPlaying(level)),
+        const LevelPlayPlaying(level),
+      ],
+      verify: (_) => expect(stopwatch.isRunning, isTrue),
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'pause() moves from falling to paused, and resume() returns to falling',
+      seed: () => const LevelPlayFalling(level),
+      build: build,
+      act: (cubit) {
+        cubit
+          ..pause()
+          ..resume();
+      },
+      expect: () => [
+        const LevelPlayPaused(level: level, resumeTo: LevelPlayFalling(level)),
+        const LevelPlayFalling(level),
+      ],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'pause() is ignored outside playing and falling',
+      seed: () => const LevelPlayReady(level),
+      build: build,
+      act: (cubit) => cubit.pause(),
+      expect: () => <LevelPlayState>[],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'resume() is ignored outside paused',
+      seed: () => const LevelPlayPlaying(level),
+      build: build,
+      act: (cubit) => cubit.resume(),
+      expect: () => <LevelPlayState>[],
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
+      'elapsed excludes time spent paused',
+      seed: () => const LevelPlayReady(level),
+      build: build,
+      act: (cubit) {
+        cubit.start();
+        stopwatch.advance(const Duration(seconds: 5));
+
+        cubit.pause();
+        stopwatch.advance(const Duration(seconds: 10));
+
+        cubit.resume();
+        stopwatch.advance(const Duration(seconds: 2));
+      },
+      verify: (cubit) => expect(cubit.elapsed, const Duration(seconds: 7)),
+    );
+
+    blocTest<LevelPlayCubit, LevelPlayState>(
       'retry() moves from won back to ready',
       seed: () => const LevelPlayWon(
         level: level,
