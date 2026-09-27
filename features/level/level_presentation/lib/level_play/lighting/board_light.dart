@@ -19,6 +19,7 @@ class BoardLight {
     this.baseY = -1,
     this.baseZ = -0.35,
     this.gain = 3,
+    this.smoothingRate = 8,
   });
 
   /// The light's travel direction's X component at [Tilt.flat], roughly 25°
@@ -36,6 +37,12 @@ class BoardLight {
   /// longer, downhill-shifted shadow.
   final double gain;
 
+  /// The exponential smoothing rate (per second) the light's tilt follows
+  /// the input tilt at. The physics uses the input tilt directly, but it
+  /// arrives in discrete sensor-rate steps that would make the shadows
+  /// visibly jump if the light used it unsmoothed.
+  final double smoothingRate;
+
   /// The light's travel direction (from the light toward the scene) for
   /// [tilt]: [baseX]/[baseY]/[baseZ] at [Tilt.flat], shifted in X and Z
   /// toward the downhill direction as [tilt] increases. Need not be unit
@@ -45,4 +52,15 @@ class BoardLight {
     baseY,
     baseZ + gain * math.sin(tilt.y),
   );
+
+  /// Advances [current] toward [target] by [elapsed], using frame-rate
+  /// independent exponential smoothing at [smoothingRate].
+  Tilt smoothTowards(Tilt current, Tilt target, Duration elapsed) {
+    final seconds = elapsed.inMicroseconds / Duration.microsecondsPerSecond;
+    final rate = 1 - math.exp(-smoothingRate * seconds);
+    return Tilt(
+      x: current.x + (target.x - current.x) * rate,
+      y: current.y + (target.y - current.y) * rate,
+    );
+  }
 }

@@ -52,5 +52,58 @@ void main() {
 
       expect(direction.y, closeTo(light.baseY, 1e-6));
     });
+
+    group('smoothTowards', () {
+      final target = Tilt(x: 0.2, y: -0.1);
+
+      test('moves part of the way toward the target in one frame', () {
+        final next = light.smoothTowards(
+          Tilt.flat,
+          target,
+          const Duration(milliseconds: 16),
+        );
+
+        expect(next.x, greaterThan(0));
+        expect(next.x, lessThan(target.x));
+        expect(next.y, lessThan(0));
+        expect(next.y, greaterThan(target.y));
+      });
+
+      test('does not move with zero elapsed time', () {
+        final next = light.smoothTowards(Tilt.flat, target, Duration.zero);
+
+        expect(next, Tilt.flat);
+      });
+
+      test('is frame-rate independent', () {
+        var byHalves = Tilt.flat;
+        for (var i = 0; i < 2; i++) {
+          byHalves = light.smoothTowards(
+            byHalves,
+            target,
+            const Duration(milliseconds: 8),
+          );
+        }
+        final whole = light.smoothTowards(
+          Tilt.flat,
+          target,
+          const Duration(milliseconds: 16),
+        );
+
+        expect(byHalves.x, closeTo(whole.x, 1e-9));
+        expect(byHalves.y, closeTo(whole.y, 1e-9));
+      });
+
+      test('converges on the target', () {
+        final next = light.smoothTowards(
+          Tilt.flat,
+          target,
+          const Duration(seconds: 2),
+        );
+
+        expect(next.x, closeTo(target.x, 1e-4));
+        expect(next.y, closeTo(target.y, 1e-4));
+      });
+    });
   });
 }

@@ -196,6 +196,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
   Duration? _exitStartElapsed;
   vm.Vector3? _exitStartPosition;
   Duration? _lastWallHitImpactElapsed;
+  // Null until the first tick, which snaps it straight to that frame's
+  // tilt rather than easing in from flat.
+  Tilt? _lightTilt;
   // Null until the first `_updateCamera` call, which snaps it straight to
   // that frame's target instead of smoothing in from `(0, 0)`: smoothing in
   // would otherwise visibly glide the camera into place right as the board
@@ -525,8 +528,14 @@ class _BoardSceneViewState extends State<BoardSceneView>
     // temporarily diverge from.
     final cameraHeight = _updateCamera(delta);
 
+    final previousLightTilt = _lightTilt;
+    final lightTilt = previousLightTilt == null
+        ? tilt
+        : _boardLight.smoothTowards(previousLightTilt, tilt, delta);
+    _lightTilt = lightTilt;
+
     _scene.directionalLight!
-      ..direction = _boardLight.directionFor(tilt)
+      ..direction = _boardLight.directionFor(lightTilt)
       ..shadowMaxDistance = cameraHeight * _shadowMaxDistanceFactor;
   }
 
