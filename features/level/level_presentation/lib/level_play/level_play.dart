@@ -5,6 +5,7 @@ export 'cubit/level_play_cubit.dart';
 export 'cubit/level_play_state.dart';
 export 'haptics/haptics_decider.dart';
 export 'input/level_play_input_controller.dart';
+export 'lighting/board_light.dart';
 export 'view/board_scene_view.dart';
 export 'view/frame_clock.dart';
 export 'view/level_play_error_view.dart';

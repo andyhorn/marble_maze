@@ -1,289 +1,317 @@
+import 'dart:ui' as ui;
+
+import 'package:flutter_scene/scene.dart' show PerspectiveCamera;
 import 'package:flutter_test/flutter_test.dart';
 import 'package:level_presentation/level_presentation.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
-/// Builds a standard right-handed lookAt/perspective view-projection matrix
-/// from [pose] and [fovRadiansY]/[aspectRatio], independent of
-/// `BoardCamera`'s own trig, so these tests check its output geometrically
-/// rather than re-deriving (and risking repeating a mistake in) its formula.
-vm.Matrix4 _viewProjection(
-  BoardCameraPose pose, {
-  required double fovRadiansY,
-  required double aspectRatio,
-}) {
-  final view = vm.makeViewMatrix(
-    pose.position,
-    pose.target,
-    vm.Vector3(0, 1, 0),
+/// Builds a real `PerspectiveCamera` from [pose], the same type
+/// `BoardSceneView` renders with, so these tests check the pose against the
+/// engine's own view/projection maths rather than re-deriving it.
+PerspectiveCamera _camera(BoardCameraPose pose, {required double fovRadiansY}) {
+  return PerspectiveCamera(
+    fovRadiansY: fovRadiansY,
+    position: pose.position,
+    target: pose.target,
+    up: pose.up,
   );
-  final projection = vm.makePerspectiveMatrix(
-    fovRadiansY,
-    aspectRatio,
-    0.1,
-    1000,
-  );
-  return projection.multiplied(view);
 }
 
-/// The normalized device coordinates (x, y in `[-1, 1]` when on screen) of
-/// [world] under [viewProjection].
-vm.Vector2 _ndc(vm.Matrix4 viewProjection, vm.Vector3 world) {
-  final clip = viewProjection.transform(
-    vm.Vector4(world.x, world.y, world.z, 1),
-  );
-  return vm.Vector2(clip.x / clip.w, clip.y / clip.w);
-}
+const _viewSize = ui.Size(390, 844);
 
 void main() {
   group('BoardCamera', () {
-    const aspectRatio = 9 / 16;
+    const camera = BoardCamera();
+    final focusOrigin = vm.Vector2.zero();
 
-    group('width fit', () {
-      // margin defaults to 1, an exact edge fit; a separate test covers
-      // margin's padding.
-      const camera = BoardCamera();
-      const boardWidth = 9.0;
-      const cameraZ = 0.0;
-
-      test('the near, outer wall-top corners land exactly at the screen '
-          'edge', () {
+    group('orientation', () {
+      test('screen right is world +X and screen up is world +Z', () {
+        const boardWidth = 9.0;
+        const boardHeight = 16.0;
         final pose = camera.poseFor(
           boardWidth: boardWidth,
+          boardHeight: boardHeight,
+          viewportAspectRatio: _viewSize.width / _viewSize.height,
+          focus: focusOrigin,
+        );
+        final engineCamera = _camera(pose, fovRadiansY: camera.fovRadiansY);
+
+        final center = engineCamera.worldToScreen(pose.target, _viewSize)!;
+        final right = engineCamera.worldToScreen(
+          pose.target + vm.Vector3(1, 0, 0),
+          _viewSize,
+        )!;
+        final up = engineCamera.worldToScreen(
+          pose.target + vm.Vector3(0, 0, 1),
+          _viewSize,
+        )!;
+
+        expect(right.dx, greaterThan(center.dx));
+        expect(up.dy, lessThan(center.dy));
+      });
+    });
+
+    group('visibleSizeAtWallTop', () {
+      const aspectRatio = 9 / 16;
+
+      test('a tall board is width-limited: equal in width, narrower in '
+          'height', () {
+        const boardWidth = 9.0;
+        const boardHeight = 40.0;
+
+        final visible = camera.visibleSizeAtWallTop(
+          boardWidth: boardWidth,
+          boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
-          cameraZ: cameraZ,
-        );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: camera.fovRadiansY,
-          aspectRatio: aspectRatio,
-        );
-        final nearZ = cameraZ + camera.nearWallTopZ(pose.position.y);
-
-        final leftCorner = _ndc(
-          viewProjection,
-          vm.Vector3(-boardWidth / 2, camera.wallTopHeight, nearZ),
-        );
-        final rightCorner = _ndc(
-          viewProjection,
-          vm.Vector3(boardWidth / 2, camera.wallTopHeight, nearZ),
         );
 
-        // Whether world +X maps to NDC +1 or -1 is this test matrix's own
-        // (right-handed lookAt) convention, independent of the left-handed
-        // convention `BoardSceneView`'s actual camera renders with; the
-        // fit itself is what's under test, so check magnitude and that the
-        // two corners land on opposite edges.
-        expect(leftCorner.x.abs(), closeTo(1, 1e-6));
-        expect(rightCorner.x.abs(), closeTo(1, 1e-6));
-        expect(leftCorner.x, closeTo(-rightCorner.x, 1e-6));
+        expect(visible.width, closeTo(boardWidth, 1e-9));
+        expect(visible.height, lessThanOrEqualTo(boardHeight));
       });
 
-      test('margin above 1 pulls the fit comfortably inside the screen', () {
-        const paddedCamera = BoardCamera(margin: 1.1);
-        final pose = paddedCamera.poseFor(
+      test('a wide board is height-limited: equal in height, narrower in '
+          'width', () {
+        const boardWidth = 40.0;
+        const boardHeight = 9.0;
+
+        final visible = camera.visibleSizeAtWallTop(
           boardWidth: boardWidth,
+          boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
-          cameraZ: cameraZ,
-        );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: paddedCamera.fovRadiansY,
-          aspectRatio: aspectRatio,
-        );
-        final nearZ = cameraZ + paddedCamera.nearWallTopZ(pose.position.y);
-
-        final rightCorner = _ndc(
-          viewProjection,
-          vm.Vector3(boardWidth / 2, paddedCamera.wallTopHeight, nearZ),
         );
 
-        expect(rightCorner.x.abs(), lessThan(1));
-        expect(rightCorner.x.abs(), greaterThan(0.85));
+        expect(visible.height, closeTo(boardHeight, 1e-9));
+        expect(visible.width, lessThanOrEqualTo(boardWidth));
       });
 
-      test('no board corner at the wall-top height is cropped anywhere in '
-          'the visible depth', () {
-        final cameraHeight = camera.cameraHeightToFitWidth(
-          boardWidth,
-          aspectRatio,
-        );
-        final pose = camera.poseFor(
-          boardWidth: boardWidth,
-          viewportAspectRatio: aspectRatio,
-          cameraZ: cameraZ,
-        );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: camera.fovRadiansY,
-          aspectRatio: aspectRatio,
-        );
-        final nearZ = cameraZ - camera.nearSpan(cameraHeight);
-        final farZ = cameraZ + camera.farSpan(cameraHeight);
+      test('a board matching the viewport aspect ratio fits exactly in '
+          'both axes', () {
+        const boardHeight = 16.0;
+        const boardWidth = boardHeight * aspectRatio;
 
-        for (final z in [nearZ, (nearZ + farZ) / 2, farZ]) {
-          final left = _ndc(
-            viewProjection,
-            vm.Vector3(-boardWidth / 2, camera.wallTopHeight, z),
+        final visible = camera.visibleSizeAtWallTop(
+          boardWidth: boardWidth,
+          boardHeight: boardHeight,
+          viewportAspectRatio: aspectRatio,
+        );
+
+        expect(visible.width, closeTo(boardWidth, 1e-9));
+        expect(visible.height, closeTo(boardHeight, 1e-9));
+      });
+
+      test('the visible rectangle never exceeds the board in either axis, '
+          'even at a non-dyadic device aspect ratio', () {
+        const deviceAspectRatio = 390 / 844;
+        for (final size in [
+          (width: 9.0, height: 40.0),
+          (width: 40.0, height: 9.0),
+          (width: 9.0, height: 9.0 / deviceAspectRatio),
+        ]) {
+          final visible = camera.visibleSizeAtWallTop(
+            boardWidth: size.width,
+            boardHeight: size.height,
+            viewportAspectRatio: deviceAspectRatio,
           );
-          final right = _ndc(
-            viewProjection,
-            vm.Vector3(boardWidth / 2, camera.wallTopHeight, z),
-          );
-          expect(left.x, greaterThanOrEqualTo(-1.0001));
-          expect(right.x, lessThanOrEqualTo(1.0001));
+
+          expect(visible.width, lessThanOrEqualTo(size.width + 1e-9));
+          expect(visible.height, lessThanOrEqualTo(size.height + 1e-9));
         }
       });
     });
 
-    group('vertical centering', () {
-      const camera = BoardCamera();
+    group('cameraHeightFor', () {
+      test('a taller visible extent needs a higher camera', () {
+        final shortHeight = camera.cameraHeightFor(5);
+        final tallHeight = camera.cameraHeightFor(20);
 
-      test('a small board fits and is screen-centered', () {
-        const boardWidth = 9.0;
-        const boardHeight = 9.0;
-
-        expect(
-          camera.fitsOnScreen(
-            boardWidth: boardWidth,
-            boardHeight: boardHeight,
-            viewportAspectRatio: aspectRatio,
-          ),
-          isTrue,
-        );
-
-        final targetZ = camera.targetZFor(
-          marbleZ: 3,
-          boardWidth: boardWidth,
-          boardHeight: boardHeight,
-          viewportAspectRatio: aspectRatio,
-        );
-        final pose = camera.poseFor(
-          boardWidth: boardWidth,
-          viewportAspectRatio: aspectRatio,
-          cameraZ: targetZ,
-        );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: camera.fovRadiansY,
-          aspectRatio: aspectRatio,
-        );
-
-        final near = _ndc(viewProjection, vm.Vector3(0, 0, -boardHeight / 2));
-        final far = _ndc(viewProjection, vm.Vector3(0, 0, boardHeight / 2));
-
-        expect(near.y, closeTo(-far.y, 1e-4));
+        expect(tallHeight, greaterThan(shortHeight));
       });
 
-      test('the follow target is unaffected by marbleZ once centered', () {
-        const boardWidth = 9.0;
-        const boardHeight = 9.0;
+      test('matches the trigonometric fit at the wall-top plane', () {
+        const visibleHeight = 8.0;
+        final height = camera.cameraHeightFor(visibleHeight);
+        final heightAboveWallTop = height - camera.wallTopHeight;
 
-        final targetNearStart = camera.targetZFor(
-          marbleZ: -3,
-          boardWidth: boardWidth,
-          boardHeight: boardHeight,
-          viewportAspectRatio: aspectRatio,
+        expect(
+          heightAboveWallTop * 2 * (visibleHeight / 2 / heightAboveWallTop),
+          closeTo(visibleHeight, 1e-9),
         );
-        final targetNearEnd = camera.targetZFor(
-          marbleZ: 3,
-          boardWidth: boardWidth,
-          boardHeight: boardHeight,
-          viewportAspectRatio: aspectRatio,
-        );
-
-        expect(targetNearStart, targetNearEnd);
       });
     });
 
-    group('following a tall board', () {
-      const camera = BoardCamera();
-      const boardWidth = 9.0;
-      const boardHeight = 40.0;
+    group('focusFor', () {
+      const aspectRatio = 9 / 16;
 
-      test('a tall board does not fit and the target follows the marble', () {
-        expect(
-          camera.fitsOnScreen(
-            boardWidth: boardWidth,
-            boardHeight: boardHeight,
-            viewportAspectRatio: aspectRatio,
-          ),
-          isFalse,
-        );
+      test('a board exactly matching the viewport gives focus (0, 0)', () {
+        const boardHeight = 16.0;
+        const boardWidth = boardHeight * aspectRatio;
 
-        // Comfortably inside the follow clamp range (unlike the near and
-        // far spans, which are unequal under perspective, this Z is well
-        // clear of either edge).
-        const marbleZ = 1.0;
-        final target = camera.targetZFor(
-          marbleZ: marbleZ,
+        final focus = camera.focusFor(
+          marbleX: 3,
+          marbleZ: -4,
           boardWidth: boardWidth,
           boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
         );
 
-        expect(target, marbleZ);
+        expect(focus.x, closeTo(0, 1e-9));
+        expect(focus.y, closeTo(0, 1e-9));
       });
 
-      test('the follow target is clamped so the far board edge never goes '
-          'past the screen edge', () {
-        final target = camera.targetZFor(
+      test('clamps a marble beyond a tall board corner to keep the visible '
+          'rectangle inside the board', () {
+        const boardWidth = 9.0;
+        const boardHeight = 40.0;
+
+        final focus = camera.focusFor(
+          marbleX: 1000,
           marbleZ: 1000,
           boardWidth: boardWidth,
           boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
         );
-        final pose = camera.poseFor(
+        final visible = camera.visibleSizeAtWallTop(
           boardWidth: boardWidth,
+          boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
-          cameraZ: target,
-        );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: camera.fovRadiansY,
-          aspectRatio: aspectRatio,
         );
 
-        final farBoardEdge = _ndc(
-          viewProjection,
-          vm.Vector3(0, 0, boardHeight / 2),
+        expect(focus.x + visible.width / 2, lessThanOrEqualTo(boardWidth / 2));
+        expect(
+          focus.x - visible.width / 2,
+          greaterThanOrEqualTo(-boardWidth / 2),
         );
-
-        expect(farBoardEdge.y, closeTo(1, 1e-4));
-        expect(target, lessThan(boardHeight / 2));
+        expect(
+          focus.y + visible.height / 2,
+          lessThanOrEqualTo(boardHeight / 2 + 1e-9),
+        );
+        expect(
+          focus.y - visible.height / 2,
+          greaterThanOrEqualTo(-boardHeight / 2 - 1e-9),
+        );
       });
 
-      test('the follow target is clamped so the near board edge never goes '
-          'past the screen edge', () {
-        final target = camera.targetZFor(
+      test('clamps a marble beyond a wide board corner', () {
+        const boardWidth = 40.0;
+        const boardHeight = 9.0;
+
+        final focus = camera.focusFor(
+          marbleX: -1000,
           marbleZ: -1000,
+          boardWidth: boardWidth,
+          boardHeight: boardHeight,
+          viewportAspectRatio: aspectRatio,
+        );
+        final visible = camera.visibleSizeAtWallTop(
+          boardWidth: boardWidth,
+          boardHeight: boardHeight,
+          viewportAspectRatio: aspectRatio,
+        );
+
+        expect(
+          focus.x - visible.width / 2,
+          greaterThanOrEqualTo(-boardWidth / 2),
+        );
+        expect(
+          focus.y - visible.height / 2,
+          greaterThanOrEqualTo(-boardHeight / 2 - 1e-9),
+        );
+      });
+
+      test('does not throw at an exact-match board on a non-dyadic device '
+          'aspect ratio', () {
+        const deviceAspectRatio = 390 / 844;
+        const boardHeight = 16.0;
+        const boardWidth = boardHeight * deviceAspectRatio;
+
+        expect(
+          () => camera.focusFor(
+            marbleX: 1000,
+            marbleZ: -1000,
+            boardWidth: boardWidth,
+            boardHeight: boardHeight,
+            viewportAspectRatio: deviceAspectRatio,
+          ),
+          returnsNormally,
+        );
+      });
+    });
+
+    group('no background ever visible', () {
+      const aspectRatio = 9 / 16;
+
+      void expectBoardFillsScreen({
+        required double boardWidth,
+        required double boardHeight,
+        required double marbleX,
+        required double marbleZ,
+      }) {
+        final focus = camera.focusFor(
+          marbleX: marbleX,
+          marbleZ: marbleZ,
           boardWidth: boardWidth,
           boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
         );
         final pose = camera.poseFor(
           boardWidth: boardWidth,
+          boardHeight: boardHeight,
           viewportAspectRatio: aspectRatio,
-          cameraZ: target,
+          focus: focus,
         );
-        final viewProjection = _viewProjection(
-          pose,
-          fovRadiansY: camera.fovRadiansY,
-          aspectRatio: aspectRatio,
-        );
+        final engineCamera = _camera(pose, fovRadiansY: camera.fovRadiansY);
 
-        final nearBoardEdge = _ndc(
-          viewProjection,
-          vm.Vector3(0, 0, -boardHeight / 2),
-        );
+        // The focus is always clamped so a board corner is never nearer to
+        // it than the corresponding visible-rectangle edge; so each wall-top
+        // corner's screen projection must land at or beyond the matching
+        // screen edge, never strictly inside it (which would expose
+        // background beyond the board).
+        for (final x in [-boardWidth / 2, boardWidth / 2]) {
+          for (final z in [-boardHeight / 2, boardHeight / 2]) {
+            final corner = vm.Vector3(x, camera.wallTopHeight, z);
+            final screen = engineCamera.worldToScreen(corner, _viewSize)!;
+            if (x < 0) {
+              expect(screen.dx, lessThanOrEqualTo(1e-6));
+            } else {
+              expect(screen.dx, greaterThanOrEqualTo(_viewSize.width - 1e-6));
+            }
+            // World +Z is screen up, so the top-of-screen (dy near 0)
+            // corresponds to the far (+Z) board edge.
+            if (z < 0) {
+              expect(screen.dy, greaterThanOrEqualTo(_viewSize.height - 1e-6));
+            } else {
+              expect(screen.dy, lessThanOrEqualTo(1e-6));
+            }
+          }
+        }
+      }
 
-        expect(nearBoardEdge.y, closeTo(-1, 1e-4));
-        expect(target, greaterThan(-boardHeight / 2));
-      });
+      for (final board in [
+        (width: 9.0, height: 40.0),
+        (width: 40.0, height: 9.0),
+        (width: 16.0 * aspectRatio, height: 16.0),
+      ]) {
+        for (final marble in [
+          (x: 0.0, z: 0.0),
+          (x: board.width / 2, z: board.height / 2),
+          (x: -board.width / 2, z: -board.height / 2),
+          (x: 1000.0, z: 1000.0),
+        ]) {
+          test(
+            'board ${board.width}x${board.height}, marble at '
+            '(${marble.x}, ${marble.z})',
+            () => expectBoardFillsScreen(
+              boardWidth: board.width,
+              boardHeight: board.height,
+              marbleX: marble.x,
+              marbleZ: marble.z,
+            ),
+          );
+        }
+      }
     });
 
     group('smoothing', () {
-      const camera = BoardCamera();
-
       test('smoothing converges to the same place at 60 fps and 120 fps', () {
         const totalDuration = Duration(milliseconds: 500);
         const frame60 = Duration(milliseconds: 16, microseconds: 667);

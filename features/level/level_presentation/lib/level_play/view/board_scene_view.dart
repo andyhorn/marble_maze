@@ -12,9 +12,11 @@ import 'package:level_presentation/level_play/animation/marble_sink_animation.da
 import 'package:level_presentation/level_play/camera/board_camera.dart';
 import 'package:level_presentation/level_play/haptics/haptics_decider.dart';
 import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
+import 'package:level_presentation/level_play/lighting/board_light.dart';
 import 'package:level_presentation/level_play/view/frame_clock.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:simulation_domain/simulation_domain.dart';
+import 'package:tilt_domain/tilt_domain.dart';
 import 'package:vector_math/vector_math.dart' as vm;
 
 /// The sink animation played when the marble falls into a hole or leaves
@@ -57,20 +59,29 @@ const double _woodUvUnitsPerTile = 1.6;
 /// depths match this, so the marble comes to rest exactly at the bottom.
 const double _cupDepth = 0.5;
 
-/// The touch tilt's contribution to the board's visual rotation, scaled
-/// down from a full physical tilt since it is only a touch-mode cue: with
-/// the accelerometer, the phone itself is the board, so the rendered board
-/// must stay fixed to the screen.
-const double _visualTiltScale = 0.5;
+/// The directional light's travel direction maths: a world light that stays
+/// fixed in place while the board tilts beneath it, so shadows shift with
+/// tilt rather than staying put.
+const _boardLight = BoardLight();
 
-/// The directional light's travel direction, chosen so walls cast a clear,
-/// unambiguous shadow onto the floor at the board camera's fixed pitch (see
-/// `BoardCamera.pitchRadians`): a negative Z component sends the light
-/// travelling toward the camera, so a wall's shadow lands on its
-/// camera-facing side (the near, `-Z` face). A shadow cast the other way,
-/// away from the camera, sits mostly in the sliver of floor a wall's own
-/// height already hides from this pitch, and so barely reads at all.
-final vm.Vector3 _directionalLightDirection = vm.Vector3(-0.4, -1, -0.45);
+/// How many camera heights out the directional shadow's cascade reaches:
+/// the whole scene is roughly one camera height away from the camera, so
+/// this comfortably covers it without wasting resolution the way
+/// flutter_scene's much larger default (`150`, spread over 4 cascades)
+/// would with only [_shadowCascadeCount].
+const double _shadowMaxDistanceFactor = 1.3;
+
+/// The directional shadow's cascade count: `1`, since the light's direction
+/// changes every frame (see [_shadowCacheStaticShadows]) and the scene's
+/// small, fixed-height view has no need to spread resolution over several
+/// cascades at different distances.
+const int _shadowCascadeCount = 1;
+
+/// Whether the directional shadow caches `shadowStatic` nodes across
+/// frames: `false`, since the light's direction changes every frame as the
+/// board tilts, and rebuilding and replaying a cache would cost more than
+/// rendering casters directly.
+const bool _shadowCacheStaticShadows = false;
 
 /// The directional light's intensity, raised above flutter_scene's default
 /// (`3.0`) so lit surfaces read clearly brighter than [_environmentIntensity]
@@ -104,23 +115,22 @@ const double _ambientOcclusionIntensity = 0.6;
 /// once [_environmentIntensity] is this low.
 const double _ambientOcclusionDirectLightAffect = 0.25;
 
-/// The plain background colour shown behind the board on a level short
-/// enough to be screen-centered with margin above and below it: a dark warm
-/// brown that sits quietly behind the wood floor and walls rather than
-/// competing with them.
+/// A harmless fallback background colour, never actually seen: the camera
+/// always cover-fits the board to the viewport, so this never shows through.
+/// A dark warm brown, matching the wood floor and walls, in case it ever
+/// does.
 const Color _boardBackgroundColor = Color(0xFF2B1D12);
 
 /// Renders the board and marble with flutter_scene, and drives the frame
 /// loop: reads the current tilt from [controller], steps [simulation], and
 /// updates the scene from it.
 ///
-/// The board stays fixed to the screen: with the accelerometer, the phone
-/// itself is the board, so the rendered board does not rotate with the
-/// physical tilt.
-/// The board root node's rotation instead follows [controller]'s
-/// `visualTilt`, a small, scaled-down touch-mode cue shown only while a
-/// finger is down or easing back to flat after release. Gravity, not board
-/// rotation, drives the physics inside [simulation] either way.
+/// The board is fixed to the screen, always: it never rotates, in either
+/// accelerometer or touch mode. Instead, the camera looks straight down at
+/// it and the directional light's travel direction shifts with the current
+/// tilt (see [BoardLight]), so shadows read as though a world light stays
+/// put while the board tilts beneath it. Gravity, not board rotation,
+/// drives the physics inside [simulation] either way.
 ///
 /// On a [FellInHole] or [LeftBoard] simulation event, this plays a sink
 /// animation on the marble, then calls `simulation.respawn()`. [onMarbleFell]
@@ -187,10 +197,10 @@ class _BoardSceneViewState extends State<BoardSceneView>
   vm.Vector3? _exitStartPosition;
   Duration? _lastWallHitImpactElapsed;
   // Null until the first `_updateCamera` call, which snaps it straight to
-  // that frame's target instead of smoothing in from `0`: on a level that's
-  // screen-centered rather than at Z `0`, smoothing in would otherwise
-  // visibly glide the camera into place right as the board first appears.
-  double? _cameraZ;
+  // that frame's target instead of smoothing in from `(0, 0)`: smoothing in
+  // would otherwise visibly glide the camera into place right as the board
+  // first appears.
+  vm.Vector2? _cameraFocus;
   double _viewportAspectRatio = 16 / 9;
   bool _ready = false;
 
@@ -279,15 +289,20 @@ class _BoardSceneViewState extends State<BoardSceneView>
     _boardRoot.add(_marbleNode);
     _camera = PerspectiveCamera(
       fovRadiansY: _boardCamera.fovRadiansY,
-      position: vm.Vector3(0, 8, -6),
+      position: vm.Vector3(0, 8, 0),
       target: vm.Vector3(0, 0, 0),
+      // The default (0, 1, 0) is degenerate for a camera looking straight
+      // down; this camera never looks anywhere else, so this never changes.
+      up: vm.Vector3(0, 0, 1),
     );
     _scene
       ..add(_boardRoot)
       ..directionalLight = DirectionalLight(
-        direction: _directionalLightDirection,
+        direction: _boardLight.directionFor(Tilt.flat),
         intensity: _directionalLightIntensity,
         castsShadow: true,
+        cacheStaticShadows: _shadowCacheStaticShadows,
+        shadowCascadeCount: _shadowCascadeCount,
         shadowMapResolution: _shadowMapResolution,
         shadowSoftness: _shadowSoftness,
       )
@@ -302,10 +317,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
     unawaited(
       _scene.loadEnvironment(
         _environmentAsset,
-        // The board fills a fixed-to-screen viewport rather than an
-        // explorable 3D space, so the sky is never seen; disabling it lets
-        // the plain background color behind `SceneView` show through any
-        // margin around a board shorter than the screen.
+        // The camera always looks straight down and cover-fits the board to
+        // the viewport, so the sky is never seen; disabling it is a cheap
+        // saving.
         showSkybox: false,
         // Dimmed well below the directional light's contribution, so cast
         // shadows read clearly instead of being washed out by ambient IBL.
@@ -486,22 +500,6 @@ class _BoardSceneViewState extends State<BoardSceneView>
       widget.simulation.step(tilt, delta);
     }
 
-    // The board stays fixed to the screen except for this small visual
-    // tilt, a touch-mode cue rather than a physical rotation: with the
-    // accelerometer, the phone itself is the board, so rotating it to match
-    // [tilt] (which the marble's physics actually uses) would double-tilt
-    // it from the player's point of view.
-    final visualTilt = widget.controller.visualTilt;
-    _boardRoot.rotation =
-        vm.Quaternion.axisAngle(
-          vm.Vector3(0, 0, 1),
-          -visualTilt.x * _visualTiltScale,
-        ) *
-        vm.Quaternion.axisAngle(
-          vm.Vector3(1, 0, 0),
-          visualTilt.y * _visualTiltScale,
-        );
-
     if (_isExiting && widget.simulation.marble.isActive) {
       // Retry respawns the simulation's marble, which ends the exit
       // animation that would otherwise keep drawing it in the cup.
@@ -520,7 +518,16 @@ class _BoardSceneViewState extends State<BoardSceneView>
         ..rotation = marble.rotation
         ..scale = vm.Vector3.all(1);
     }
-    _updateCamera(delta);
+
+    // Read after the marble node update above, so the camera follows the
+    // node's actual on-screen position (including during the fall and exit
+    // animations) rather than the simulation's, which the animations
+    // temporarily diverge from.
+    final cameraHeight = _updateCamera(delta);
+
+    _scene.directionalLight!
+      ..direction = _boardLight.directionFor(tilt)
+      ..shadowMaxDistance = cameraHeight * _shadowMaxDistanceFactor;
   }
 
   void _updateExitingMarble(Duration elapsed) {
@@ -544,32 +551,42 @@ class _BoardSceneViewState extends State<BoardSceneView>
     _marbleNode.position = settled;
   }
 
-  /// Advances the camera's Z target toward the marble (or the exit cup,
-  /// once won) and toward the board's center on a level that fits on
-  /// screen, smoothing frame-rate independently.
-  void _updateCamera(Duration delta) {
+  /// Advances the camera's X/Z focus toward the marble node's current
+  /// position, smoothing frame-rate independently per axis, and updates
+  /// [_camera] from it. Returns the camera's height above the floor, so the
+  /// caller can size the directional shadow's cascade to it.
+  double _updateCamera(Duration delta) {
     final level = widget.level;
-    final marbleZ = widget.simulation.marble.position.z;
-    final targetZ = _boardCamera.targetZFor(
-      marbleZ: marbleZ,
-      boardWidth: level.width.toDouble(),
-      boardHeight: level.height.toDouble(),
+    final boardWidth = level.width.toDouble();
+    final boardHeight = level.height.toDouble();
+    final marblePosition = _marbleNode.position;
+    final target = _boardCamera.focusFor(
+      marbleX: marblePosition.x,
+      marbleZ: marblePosition.z,
+      boardWidth: boardWidth,
+      boardHeight: boardHeight,
       viewportAspectRatio: _viewportAspectRatio,
     );
-    final currentCameraZ = _cameraZ;
-    final cameraZ = currentCameraZ == null
-        ? targetZ
-        : _boardCamera.smoothTowards(currentCameraZ, targetZ, delta);
-    _cameraZ = cameraZ;
+    final currentFocus = _cameraFocus;
+    final focus = currentFocus == null
+        ? target
+        : vm.Vector2(
+            _boardCamera.smoothTowards(currentFocus.x, target.x, delta),
+            _boardCamera.smoothTowards(currentFocus.y, target.y, delta),
+          );
+    _cameraFocus = focus;
 
     final pose = _boardCamera.poseFor(
-      boardWidth: level.width.toDouble(),
+      boardWidth: boardWidth,
+      boardHeight: boardHeight,
       viewportAspectRatio: _viewportAspectRatio,
-      cameraZ: cameraZ,
+      focus: focus,
     );
     _camera
       ..position = pose.position
-      ..target = pose.target;
+      ..target = pose.target
+      ..up = pose.up;
+    return pose.position.y;
   }
 
   void _updateFallingMarble(Duration elapsed) {
@@ -648,8 +665,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
             // fire before build/layout), so a first-tick or post-rotation
             // snap-to-target would still land on a stale aspect ratio
             // without also resetting this: cleared so `_updateCamera` snaps
-            // fresh instead of gliding from a Z computed for the old one.
-            _cameraZ = null;
+            // fresh instead of gliding from a focus computed for the old
+            // one.
+            _cameraFocus = null;
           }
         }
         return GestureDetector(
@@ -658,9 +676,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
           onPanCancel: _onPanCancel,
-          // Shows through the margin above/below a board that's shorter
-          // than the screen; `_scene`'s skybox is disabled so those pixels
-          // are transparent rather than the HDR environment.
+          // A harmless fallback that's never actually seen: the camera
+          // always cover-fits the board to the viewport in both axes, so
+          // `SceneView` fills this box completely every frame.
           child: ColoredBox(
             color: _boardBackgroundColor,
             child: SceneView(_scene, camera: _camera),

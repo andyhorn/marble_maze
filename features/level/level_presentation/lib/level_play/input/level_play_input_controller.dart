@@ -63,15 +63,6 @@ class LevelPlayInputController extends ChangeNotifier {
     return _touchTiltMapper.tilt;
   }
 
-  /// The touch tilt while a finger is down or its release-ease is still in
-  /// progress, otherwise [Tilt.flat].
-  ///
-  /// With the accelerometer, the phone is the board, so the rendered board
-  /// must stay fixed to the screen; this is what the view rotates the board
-  /// root by instead of [tilt], as a small touch-mode cue rather than a
-  /// physical tilt.
-  Tilt get visualTilt => _touchTiltMapper.tilt;
-
   /// Probes the accelerometer and settles [useAccelerometer] and
   /// [showHint]. Call once per level-play visit, before [tilt] is read.
   Future<void> initialize() async {

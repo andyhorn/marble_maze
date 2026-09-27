@@ -4,27 +4,43 @@ import 'package:meta/meta.dart';
 import 'package:simulation_domain/simulation_domain.dart' show kWallHeight;
 import 'package:vector_math/vector_math.dart' as vm;
 
-/// A camera position and look-at target in world space.
+/// A camera position, look-at target, and up vector in world space.
 @immutable
 class BoardCameraPose {
   /// Creates a pose.
-  const new({required this.position, required this.target});
+  const new({required this.position, required this.target, required this.up});
 
   /// The camera's world-space eye point.
   final vm.Vector3 position;
 
   /// The world-space point the camera looks at.
   final vm.Vector3 target;
+
+  /// The world-space "up" direction used to orient the camera around the
+  /// view vector.
+  final vm.Vector3 up;
 }
 
-/// The pure maths behind the level play camera: a fixed pitch and a height
-/// chosen to fit the board's width (including its outer wall border) at the
-/// near, bottom-of-screen edge of the view, where perspective leaves the
-/// least room; and, on a board too tall to also fit vertically, a Z target
-/// that follows the marble, smoothed frame-rate independently and clamped so
-/// the view never runs past the board's ends. A board that does fit
-/// vertically is instead screen-centered, which (under perspective, with the
-/// near and far view spans unequal) is not simply Z target `0`.
+/// The visible rectangle's width and height, in world units, at some
+/// horizontal plane.
+@immutable
+class BoardCameraVisibleSize {
+  /// Creates a visible size.
+  const new({required this.width, required this.height});
+
+  /// The visible rectangle's width.
+  final double width;
+
+  /// The visible rectangle's height.
+  final double height;
+}
+
+/// The pure maths behind the level play camera: a straight top-down view,
+/// cover-fit at the wall-top plane so the board (including its outer wall
+/// border) always fills the screen in both directions with nothing beyond
+/// it ever visible, and a focus point that follows the marble in X and Z,
+/// smoothed frame-rate independently and clamped so the visible rectangle
+/// never runs past the board's edges.
 ///
 /// Kept separate from `BoardSceneView` (which owns the actual
 /// `PerspectiveCamera`) since Flutter GPU does not render in widget tests,
@@ -33,171 +49,73 @@ class BoardCameraPose {
 class BoardCamera {
   /// Creates a board camera plan with the given tuning.
   const new({
-    this.pitchRadians = 60 * math.pi / 180,
-    this.fovRadiansY = 50 * math.pi / 180,
-    this.margin = 1,
+    this.fovRadiansY = 32 * math.pi / 180,
     this.followSmoothingRate = 6,
     this.wallTopHeight = kWallHeight,
   });
 
-  /// The camera's fixed downward pitch, in radians, from horizontal. Kept in
-  /// the 55–70° range: steep enough to read as looking down at a board,
-  /// shallow enough that walls and their shadows are still visible in
-  /// profile rather than foreshortened flat.
-  final double pitchRadians;
-
   /// The camera's vertical field of view, in radians.
   final double fovRadiansY;
 
-  /// A multiplier on the width fit: `1` (the default) spans the board's
-  /// full width, including its outer wall border, exactly to the screen
-  /// edge with nothing cropped; a value above `1` pulls the camera back for
-  /// a little extra padding.
-  final double margin;
-
-  /// The exponential smoothing rate (per second) the Z target follows the
+  /// The exponential smoothing rate (per second) the focus follows the
   /// marble at. Higher values catch up faster.
   final double followSmoothingRate;
 
   /// The height, in world units, of the outer wall border's top edge above
-  /// the floor. The border wall is the tallest, nearest-to-camera geometry
-  /// at the board's outer edge, so it (not the floor) is what must clear the
-  /// screen edge for nothing to be cropped.
+  /// the floor. Cover-fitting at this plane (rather than the floor)
+  /// guarantees every edge ray hits a wall top or the maze interior, never
+  /// the void beyond the board.
   final double wallTopHeight;
 
   double get _halfFovY => fovRadiansY / 2;
 
-  double _halfFovX(double aspectRatio) =>
-      math.atan(math.tan(_halfFovY) * aspectRatio);
-
-  /// The camera's forward horizontal offset from its look-at target, for a
-  /// camera at [cameraHeight] and the fixed [pitchRadians].
-  double _horizontalOffset(double cameraHeight) =>
-      cameraHeight / math.tan(pitchRadians);
-
-  /// The camera height (world Y, above the floor plane) at which the near
-  /// (bottom-of-screen) scanline's horizontal reach, at [wallTopHeight],
-  /// exactly spans half of [boardWidth] (times [margin]).
-  ///
-  /// Perspective narrows what's visible at the far edge and widens it at the
-  /// near edge, so fitting at the near edge (rather than at the board's
-  /// center distance) is what keeps the whole width on screen everywhere.
-  double cameraHeightToFitWidth(double boardWidth, double aspectRatio) {
-    final halfFovX = _halfFovX(aspectRatio);
-    final halfWidth = boardWidth / 2 * margin;
-    final steepness =
-        math.sin(pitchRadians) + math.tan(_halfFovY) * math.cos(pitchRadians);
-    return wallTopHeight + halfWidth * steepness / math.tan(halfFovX);
-  }
-
-  /// The Z offset, from the camera's look-at target, of the point where a
-  /// ray tilted [verticalAngleOffset] from the view's center (up positive)
-  /// crosses the horizontal plane at [planeHeight], for a camera at
-  /// [cameraHeight] above that same reference (`y = 0`).
-  double _zOffsetAtPlane(
-    double verticalAngleOffset,
-    double cameraHeight,
-    double planeHeight,
-  ) {
-    final tanPhi = math.tan(verticalAngleOffset);
-    final worldY = tanPhi * math.cos(pitchRadians) - math.sin(pitchRadians);
-    final worldZ = tanPhi * math.sin(pitchRadians) + math.cos(pitchRadians);
-    final t = (planeHeight - cameraHeight) / worldY;
-    return t * worldZ - _horizontalOffset(cameraHeight);
-  }
-
-  /// How far past the look-at target, in world Z, the far (top-of-screen)
-  /// edge of the view's floor (`y = 0`) reach extends, for a camera at
-  /// [cameraHeight].
-  double farSpan(double cameraHeight) =>
-      _zOffsetAtPlane(_halfFovY, cameraHeight, 0);
-
-  /// How far short of the look-at target, in world Z, the near
-  /// (bottom-of-screen) edge of the view's floor (`y = 0`) reach falls, for
-  /// a camera at [cameraHeight]. Always less than [farSpan] at the same
-  /// height: the near edge, being closer to the camera, is reached by a
-  /// more steeply downward ray and so covers less ground.
-  double nearSpan(double cameraHeight) =>
-      -_zOffsetAtPlane(-_halfFovY, cameraHeight, 0);
-
-  /// The Z at which the near (bottom-of-screen) scanline crosses the outer
-  /// wall's top ([wallTopHeight]), for a camera at [cameraHeight] looking at
-  /// Z `0`: the point [cameraHeightToFitWidth] actually fits the board's
-  /// width at, closer to the camera than where that same scanline crosses
-  /// the floor ([nearSpan]).
-  double nearWallTopZ(double cameraHeight) =>
-      _zOffsetAtPlane(-_halfFovY, cameraHeight, wallTopHeight);
-
-  /// Whether a board of [boardWidth] by [boardHeight] fits entirely on
-  /// screen at the height that fits its width, in a viewport of
-  /// [viewportAspectRatio].
-  bool fitsOnScreen({
+  /// The visible rectangle at the wall-top plane for a board [boardWidth] by
+  /// [boardHeight] in a viewport of [viewportAspectRatio]: the largest
+  /// rectangle of that aspect ratio that fits entirely inside the board,
+  /// i.e. never larger than the board in either axis and equal to it in (at
+  /// least) one.
+  BoardCameraVisibleSize visibleSizeAtWallTop({
     required double boardWidth,
     required double boardHeight,
     required double viewportAspectRatio,
   }) {
-    final cameraHeight = cameraHeightToFitWidth(
-      boardWidth,
-      viewportAspectRatio,
+    final width = math.min(boardWidth, boardHeight * viewportAspectRatio);
+    return BoardCameraVisibleSize(
+      width: width,
+      height: width / viewportAspectRatio,
     );
-    return nearSpan(cameraHeight) + farSpan(cameraHeight) >= boardHeight;
   }
 
-  /// The look-at Z target that screen-centers a board [boardHeight] deep, at
-  /// a camera height of [cameraHeight].
-  ///
-  /// The near and far view spans are unequal under perspective, so
-  /// centering is not target `0`: it's the target whose near and far board
-  /// edges subtend equal angles from the view's center ray, found by
-  /// bisection since that condition has no closed form here. Equivalently,
-  /// the two edges' depression angles from horizontal (at the camera's
-  /// fixed height) sum to twice [pitchRadians].
-  double _centeredTargetZ(double boardHeight, double cameraHeight) {
-    final halfBoard = boardHeight / 2;
-    double angleSumAt(double nearGroundDistance) =>
-        math.atan(cameraHeight / nearGroundDistance) +
-        math.atan(cameraHeight / (nearGroundDistance + boardHeight));
+  /// The camera height (world Y, above the floor plane) that fits
+  /// [visibleHeight] world units of vertical extent, at [wallTopHeight],
+  /// exactly within the vertical field of view.
+  double cameraHeightFor(double visibleHeight) =>
+      wallTopHeight + (visibleHeight / 2) / math.tan(_halfFovY);
 
-    var low = 1e-9;
-    var high = math.max(cameraHeight, boardHeight) * 1e4 + 1;
-    for (var i = 0; i < 60; i++) {
-      final mid = (low + high) / 2;
-      if (angleSumAt(mid) > 2 * pitchRadians) {
-        low = mid;
-      } else {
-        high = mid;
-      }
-    }
-    final nearGroundDistance = (low + high) / 2;
-    final footpointZ = -halfBoard - nearGroundDistance;
-    return footpointZ + _horizontalOffset(cameraHeight);
-  }
-
-  /// The camera's Z look-at target for a board [boardWidth] by
-  /// [boardHeight]: screen-centered on the board if it fits on screen
-  /// (see [_centeredTargetZ]), otherwise [marbleZ] clamped so the visible
-  /// view never runs past the board's near/far edges.
-  double targetZFor({
+  /// The camera's X/Z focus point for a board [boardWidth] by [boardHeight]
+  /// in a viewport of [viewportAspectRatio]: the marble's position, clamped
+  /// so the visible wall-top rectangle stays inside the board. The returned
+  /// vector's `x` is world X and its `y` is world Z.
+  vm.Vector2 focusFor({
+    required double marbleX,
     required double marbleZ,
     required double boardWidth,
     required double boardHeight,
     required double viewportAspectRatio,
   }) {
-    final cameraHeight = cameraHeightToFitWidth(
-      boardWidth,
-      viewportAspectRatio,
-    );
-    if (fitsOnScreen(
+    final visible = visibleSizeAtWallTop(
       boardWidth: boardWidth,
       boardHeight: boardHeight,
       viewportAspectRatio: viewportAspectRatio,
-    )) {
-      return _centeredTargetZ(boardHeight, cameraHeight);
-    }
-    final halfBoard = boardHeight / 2;
-    final lowClamp = -halfBoard + nearSpan(cameraHeight);
-    final highClamp = halfBoard - farSpan(cameraHeight);
-    return marbleZ.clamp(lowClamp, highClamp);
+    );
+    final halfClampX = math.max(0, (boardWidth - visible.width) / 2).toDouble();
+    final halfClampZ = math
+        .max(0, (boardHeight - visible.height) / 2)
+        .toDouble();
+    return vm.Vector2(
+      marbleX.clamp(-halfClampX, halfClampX),
+      marbleZ.clamp(-halfClampZ, halfClampZ),
+    );
   }
 
   /// Advances [current] toward [target] by [elapsed], using frame-rate
@@ -208,22 +126,27 @@ class BoardCamera {
     return current + (target - current) * rate;
   }
 
-  /// The camera position and look-at target for a board [boardWidth] wide,
-  /// in a viewport of [viewportAspectRatio], with its Z look-at at
-  /// [cameraZ] (from [targetZFor], typically smoothed by [smoothTowards]).
+  /// The camera position, look-at target, and up vector for a board
+  /// [boardWidth] by [boardHeight], in a viewport of [viewportAspectRatio],
+  /// looking straight down at [focus] (world X in `focus.x`, world Z in
+  /// `focus.y`; from [focusFor], typically smoothed per axis by
+  /// [smoothTowards]).
   BoardCameraPose poseFor({
     required double boardWidth,
+    required double boardHeight,
     required double viewportAspectRatio,
-    required double cameraZ,
+    required vm.Vector2 focus,
   }) {
-    final cameraHeight = cameraHeightToFitWidth(
-      boardWidth,
-      viewportAspectRatio,
+    final visible = visibleSizeAtWallTop(
+      boardWidth: boardWidth,
+      boardHeight: boardHeight,
+      viewportAspectRatio: viewportAspectRatio,
     );
-    final horizontalOffset = _horizontalOffset(cameraHeight);
+    final cameraHeight = cameraHeightFor(visible.height);
     return BoardCameraPose(
-      position: vm.Vector3(0, cameraHeight, cameraZ - horizontalOffset),
-      target: vm.Vector3(0, 0, cameraZ),
+      position: vm.Vector3(focus.x, cameraHeight, focus.y),
+      target: vm.Vector3(focus.x, 0, focus.y),
+      up: vm.Vector3(0, 0, 1),
     );
   }
 }
