@@ -4,7 +4,7 @@ import 'package:simulation_domain/simulation_domain.dart';
 class Box3dMarbleSimulationConfig {
   /// Creates a config. See each field for its meaning.
   const new({
-    this.gravityMagnitude = 9.81,
+    this.gravityMagnitude = 9.81 * 1.5,
     this.marbleRadius = kMarbleRadius,
     this.wallHeight = kWallHeight,
     this.wallThickness = 0.2,
@@ -24,6 +24,8 @@ class Box3dMarbleSimulationConfig {
       Box3dMarbleSimulationConfig();
 
   /// Gravity's magnitude, in units per second squared, at zero tilt.
+  /// `9.81 * 1.5`: 1.5x Earth gravity, tuned for how fast the marble should
+  /// feel accelerating on a phone-sized board, not a real-world value.
   final double gravityMagnitude;
 
   /// The marble's collision radius.

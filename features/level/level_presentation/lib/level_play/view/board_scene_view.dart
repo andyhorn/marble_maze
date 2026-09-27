@@ -63,6 +63,53 @@ const double _cupDepth = 0.5;
 /// must stay fixed to the screen.
 const double _visualTiltScale = 0.5;
 
+/// The directional light's travel direction, chosen so walls cast a clear,
+/// unambiguous shadow onto the floor at the board camera's fixed pitch (see
+/// `BoardCamera.pitchRadians`): a negative Z component sends the light
+/// travelling toward the camera, so a wall's shadow lands on its
+/// camera-facing side (the near, `-Z` face). A shadow cast the other way,
+/// away from the camera, sits mostly in the sliver of floor a wall's own
+/// height already hides from this pitch, and so barely reads at all.
+final vm.Vector3 _directionalLightDirection = vm.Vector3(-0.4, -1, -0.45);
+
+/// The directional light's intensity, raised above flutter_scene's default
+/// (`3.0`) so lit surfaces read clearly brighter than [_environmentIntensity]
+/// dimmed shadow, keeping the directional light (and so its shadows) the
+/// dominant read rather than the ambient IBL term.
+const double _directionalLightIntensity = 4.5;
+
+/// The directional shadow map's resolution, raised above flutter_scene's
+/// default (`1024`) so a wall's shadow edge stays crisp at typical phone
+/// screen sizes instead of visibly blocky.
+const int _shadowMapResolution = 2048;
+
+/// The directional shadow's penumbra softness, lowered below flutter_scene's
+/// default (`0.08`) for a crisper, more legible shadow edge on a small
+/// screen.
+const double _shadowSoftness = 0.05;
+
+/// The image-based (HDR environment) lighting's intensity, dimmed well below
+/// its default (`1.0`) so it fills in ambient light without competing with,
+/// or washing out, the directional light's cast shadows.
+const double _environmentIntensity = 0.35;
+
+/// Screen-space ambient occlusion's strength: enabled, but at a modest
+/// fraction of its calibrated default (`1.0`), for a soft contact shadow in
+/// creases and corners on top of the directional light's own shadows.
+const double _ambientOcclusionIntensity = 0.6;
+
+/// How much of the screen-space occlusion also darkens the directional
+/// light, not just the (already dimmed) ambient IBL term: `0` by default,
+/// which would make ambient occlusion's contribution too faint to notice
+/// once [_environmentIntensity] is this low.
+const double _ambientOcclusionDirectLightAffect = 0.25;
+
+/// The plain background colour shown behind the board on a level short
+/// enough to be screen-centered with margin above and below it: a dark warm
+/// brown that sits quietly behind the wood floor and walls rather than
+/// competing with them.
+const Color _boardBackgroundColor = Color(0xFF2B1D12);
+
 /// Renders the board and marble with flutter_scene, and drives the frame
 /// loop: reads the current tilt from [controller], steps [simulation], and
 /// updates the scene from it.
@@ -139,7 +186,11 @@ class _BoardSceneViewState extends State<BoardSceneView>
   Duration? _exitStartElapsed;
   vm.Vector3? _exitStartPosition;
   Duration? _lastWallHitImpactElapsed;
-  double _cameraZ = 0;
+  // Null until the first `_updateCamera` call, which snaps it straight to
+  // that frame's target instead of smoothing in from `0`: on a level that's
+  // screen-centered rather than at Z `0`, smoothing in would otherwise
+  // visibly glide the camera into place right as the board first appears.
+  double? _cameraZ;
   double _viewportAspectRatio = 16 / 9;
   bool _ready = false;
 
@@ -227,19 +278,40 @@ class _BoardSceneViewState extends State<BoardSceneView>
     );
     _boardRoot.add(_marbleNode);
     _camera = PerspectiveCamera(
+      fovRadiansY: _boardCamera.fovRadiansY,
       position: vm.Vector3(0, 8, -6),
       target: vm.Vector3(0, 0, 0),
     );
     _scene
       ..add(_boardRoot)
       ..directionalLight = DirectionalLight(
-        direction: vm.Vector3(-0.4, -1, 0.5),
+        direction: _directionalLightDirection,
+        intensity: _directionalLightIntensity,
         castsShadow: true,
+        shadowMapResolution: _shadowMapResolution,
+        shadowSoftness: _shadowSoftness,
       )
       // A patterned, non-metallic marble no longer needs a mirror highlight
       // bloomed out; disabled so it doesn't wash out the swirl texture.
-      ..postProcess.bloom.enabled = false;
-    unawaited(_scene.loadEnvironment(_environmentAsset));
+      ..postProcess.bloom.enabled = false
+      // Modest screen-space contact shadowing in wall/floor creases, on top
+      // of the directional light's own cast shadows.
+      ..ambientOcclusion.enabled = true
+      ..ambientOcclusion.intensity = _ambientOcclusionIntensity
+      ..ambientOcclusion.directLightAffect = _ambientOcclusionDirectLightAffect;
+    unawaited(
+      _scene.loadEnvironment(
+        _environmentAsset,
+        // The board fills a fixed-to-screen viewport rather than an
+        // explorable 3D space, so the sky is never seen; disabling it lets
+        // the plain background color behind `SceneView` show through any
+        // margin around a board shorter than the screen.
+        showSkybox: false,
+        // Dimmed well below the directional light's contribution, so cast
+        // shadows read clearly instead of being washed out by ambient IBL.
+        intensity: _environmentIntensity,
+      ),
+    );
 
     if (!mounted) return;
     setState(() => _ready = true);
@@ -249,20 +321,35 @@ class _BoardSceneViewState extends State<BoardSceneView>
   static const Color _cupColor = Color(0xFF141414);
   static const Color _exitCupColor = Colors.amber;
 
+  /// A wall side's tint, multiplied over the shared wood texture: noticeably
+  /// darker than the floor so walls read as distinct volumes rather than
+  /// blending into it.
+  static const double _wallSideTint = 0.55;
+
+  /// A wall top's tint: lighter than [_wallSideTint] but still darker than
+  /// the floor, so each wall shows a visible top edge against its own sides.
+  static const double _wallTopTint = 0.72;
+
   /// `doubleSided` since floor tiles, opening rings, and wall faces are
   /// hand-built flat quads (see [_quadGeometry]); getting every face's
   /// winding order exactly right for backface culling is unnecessary risk
-  /// for geometry this thin.
-  static PhysicallyBasedMaterial _woodMaterial(Texture2D texture) =>
-      PhysicallyBasedMaterial()
-        ..baseColorTexture = texture
-        ..metallicFactor = 0
-        ..roughnessFactor = 0.75
-        ..doubleSided = true;
+  /// for geometry this thin. [tint] multiplies the shared wood texture,
+  /// darkening it uniformly without shifting its hue.
+  static PhysicallyBasedMaterial _woodMaterial(
+    Texture2D texture, {
+    double tint = 1,
+  }) => PhysicallyBasedMaterial()
+    ..baseColorTexture = texture
+    ..baseColorFactor = vm.Vector4(tint, tint, tint, 1)
+    ..metallicFactor = 0
+    ..roughnessFactor = 0.75
+    ..doubleSided = true;
 
   void _buildBoard(Texture2D woodTexture) {
     final level = widget.level;
     final wood = _woodMaterial(woodTexture);
+    final wallSideWood = _woodMaterial(woodTexture, tint: _wallSideTint);
+    final wallTopWood = _woodMaterial(woodTexture, tint: _wallTopTint);
     final openings = {...level.holes, level.exit};
 
     for (var row = 0; row < level.height; row++) {
@@ -301,7 +388,8 @@ class _BoardSceneViewState extends State<BoardSceneView>
             placement.center.z,
           ),
           halfExtents: vm.Vector3(placement.halfLength, kWallHeight / 2, 0.5),
-          material: wood,
+          topMaterial: wallTopWood,
+          sideMaterial: wallSideWood,
         ),
       );
     }
@@ -468,17 +556,20 @@ class _BoardSceneViewState extends State<BoardSceneView>
       boardHeight: level.height.toDouble(),
       viewportAspectRatio: _viewportAspectRatio,
     );
-    _cameraZ = _boardCamera.smoothTowards(_cameraZ, targetZ, delta);
+    final currentCameraZ = _cameraZ;
+    final cameraZ = currentCameraZ == null
+        ? targetZ
+        : _boardCamera.smoothTowards(currentCameraZ, targetZ, delta);
+    _cameraZ = cameraZ;
 
-    final distance = _boardCamera.distanceToFit(
-      level.width.toDouble(),
-      _viewportAspectRatio,
+    final pose = _boardCamera.poseFor(
+      boardWidth: level.width.toDouble(),
+      viewportAspectRatio: _viewportAspectRatio,
+      cameraZ: cameraZ,
     );
-    final horizontalOffset = distance * math.cos(_boardCamera.pitchRadians);
-    final verticalOffset = distance * math.sin(_boardCamera.pitchRadians);
     _camera
-      ..position = vm.Vector3(0, verticalOffset, _cameraZ - horizontalOffset)
-      ..target = vm.Vector3(0, 0, _cameraZ);
+      ..position = pose.position
+      ..target = pose.target;
   }
 
   void _updateFallingMarble(Duration elapsed) {
@@ -549,7 +640,17 @@ class _BoardSceneViewState extends State<BoardSceneView>
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxHeight > 0) {
-          _viewportAspectRatio = constraints.maxWidth / constraints.maxHeight;
+          final aspectRatio = constraints.maxWidth / constraints.maxHeight;
+          if (aspectRatio != _viewportAspectRatio) {
+            _viewportAspectRatio = aspectRatio;
+            // The ticker's next frame runs before this build's measured
+            // aspect ratio would otherwise reach it (transient callbacks
+            // fire before build/layout), so a first-tick or post-rotation
+            // snap-to-target would still land on a stale aspect ratio
+            // without also resetting this: cleared so `_updateCamera` snaps
+            // fresh instead of gliding from a Z computed for the old one.
+            _cameraZ = null;
+          }
         }
         return GestureDetector(
           dragStartBehavior: DragStartBehavior.down,
@@ -557,7 +658,13 @@ class _BoardSceneViewState extends State<BoardSceneView>
           onPanUpdate: _onPanUpdate,
           onPanEnd: _onPanEnd,
           onPanCancel: _onPanCancel,
-          child: SceneView(_scene, camera: _camera),
+          // Shows through the margin above/below a board that's shorter
+          // than the screen; `_scene`'s skybox is disabled so those pixels
+          // are transparent rather than the HDR environment.
+          child: ColoredBox(
+            color: _boardBackgroundColor,
+            child: SceneView(_scene, camera: _camera),
+          ),
         );
       },
     );
@@ -618,26 +725,50 @@ MeshGeometry _quadGeometry({
 /// Builds a node carrying one world-UV-mapped box face mesh per visible
 /// side (the four side faces and the top; the bottom is never seen), for a
 /// wall segment centered at [center] with the given [halfExtents].
+/// [topMaterial] shades the top face and [sideMaterial] the four sides, so a
+/// wall's top edge reads distinctly from its sides.
 Node _worldUvBoxNode({
   required vm.Vector3 center,
   required vm.Vector3 halfExtents,
-  required PhysicallyBasedMaterial material,
+  required PhysicallyBasedMaterial topMaterial,
+  required PhysicallyBasedMaterial sideMaterial,
 }) {
-  final node = Node();
-  for (final geometry in _boxFaceGeometries(
+  final topGeometry = _boxTopGeometry(center: center, halfExtents: halfExtents);
+  final node = Node()
+    ..addComponent(MeshComponent(Mesh(topGeometry, topMaterial)));
+  for (final geometry in _boxSideGeometries(
     center: center,
     halfExtents: halfExtents,
   )) {
-    node.addComponent(MeshComponent(Mesh(geometry, material)));
+    node.addComponent(MeshComponent(Mesh(geometry, sideMaterial)));
   }
   return node;
 }
 
-/// The top and four side face geometries of a box, each with world-UV
-/// texture coordinates projected onto that face's own plane, so the wood
-/// grain reads continuously across a wall's length instead of stretching
-/// end-to-end.
-Iterable<MeshGeometry> _boxFaceGeometries({
+/// The box's top face geometry, with world-UV texture coordinates projected
+/// onto its own plane so the wood grain reads continuously across a wall's
+/// length instead of stretching end-to-end.
+MeshGeometry _boxTopGeometry({
+  required vm.Vector3 center,
+  required vm.Vector3 halfExtents,
+}) {
+  final hx = halfExtents.x;
+  final hy = halfExtents.y;
+  final hz = halfExtents.z;
+  vm.Vector2 xz(vm.Vector3 p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile;
+
+  return _quadGeometry(
+    p00: vm.Vector3(center.x - hx, center.y + hy, center.z - hz),
+    u: vm.Vector3(2 * hx, 0, 0),
+    v: vm.Vector3(0, 0, 2 * hz),
+    normal: vm.Vector3(0, 1, 0),
+    uvOf: xz,
+  );
+}
+
+/// The box's four side face geometries, each with world-UV texture
+/// coordinates projected onto that face's own plane. See [_boxTopGeometry].
+Iterable<MeshGeometry> _boxSideGeometries({
   required vm.Vector3 center,
   required vm.Vector3 halfExtents,
 }) sync* {
@@ -645,18 +776,9 @@ Iterable<MeshGeometry> _boxFaceGeometries({
   final hy = halfExtents.y;
   final hz = halfExtents.z;
 
-  vm.Vector2 xz(vm.Vector3 p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile;
   vm.Vector2 zy(vm.Vector3 p) => vm.Vector2(p.z, p.y) / _woodUvUnitsPerTile;
   vm.Vector2 xy(vm.Vector3 p) => vm.Vector2(p.x, p.y) / _woodUvUnitsPerTile;
 
-  // Top (+Y).
-  yield _quadGeometry(
-    p00: vm.Vector3(center.x - hx, center.y + hy, center.z - hz),
-    u: vm.Vector3(2 * hx, 0, 0),
-    v: vm.Vector3(0, 0, 2 * hz),
-    normal: vm.Vector3(0, 1, 0),
-    uvOf: xz,
-  );
   // +X.
   yield _quadGeometry(
     p00: vm.Vector3(center.x + hx, center.y - hy, center.z - hz),
