@@ -100,7 +100,7 @@ void main() {
     test('a reading within the dead zone is flat', () {
       filter.calibrate(_flat());
 
-      final tilt = filter.filter(_rightDown(0.5));
+      final tilt = filter.filter(_rightDown(2.5));
 
       expect(tilt, Tilt.flat);
     });
@@ -108,7 +108,7 @@ void main() {
     test('a reading just past the dead zone is not flat', () {
       filter.calibrate(_flat());
 
-      final tilt = filter.filter(_rightDown(2));
+      final tilt = filter.filter(_rightDown(3.5));
 
       expect(tilt.x, greaterThan(0));
     });
