@@ -1,6 +1,9 @@
+export 'animation/marble_exit_animation.dart';
 export 'animation/marble_sink_animation.dart';
+export 'camera/board_camera.dart';
 export 'cubit/level_play_cubit.dart';
 export 'cubit/level_play_state.dart';
+export 'haptics/haptics_decider.dart';
 export 'input/level_play_input_controller.dart';
 export 'view/board_scene_view.dart';
 export 'view/frame_clock.dart';

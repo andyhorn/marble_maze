@@ -80,5 +80,15 @@ void main() {
       expect(delta, const Duration(milliseconds: 33));
       expect(clock.activeElapsed, const Duration(milliseconds: 49));
     });
+
+    test('totalElapsed advances on inactive ticks too, clamped', () {
+      final clock = FrameClock()
+        ..tick(const Duration(milliseconds: 16), isActive: false)
+        ..tick(const Duration(milliseconds: 32), isActive: true)
+        ..tick(const Duration(seconds: 5), isActive: false);
+
+      expect(clock.totalElapsed, const Duration(milliseconds: 65));
+      expect(clock.activeElapsed, const Duration(milliseconds: 16));
+    });
   });
 }

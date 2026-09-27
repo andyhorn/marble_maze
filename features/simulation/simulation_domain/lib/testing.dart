@@ -194,6 +194,45 @@ void runMarbleSimulationContractTests(
           }
         },
       );
+
+      test(
+        'rolling into a wall fast emits HitWall with positive speed',
+        () async {
+          final events = <SimulationEvent>[];
+          final subscription = harness.simulation.events.listen(events.add);
+          final restY = harness.simulation.marble.position.y;
+          harness.handle.placeMarble(Vector3(_wallX - 2, restY, 0));
+          harness.handle.setMarbleVelocity(Vector3(4, 0, 0));
+
+          _stepFor(
+            harness.simulation,
+            Tilt.flat,
+            const Duration(milliseconds: 500),
+          );
+          await pumpEventQueue();
+
+          expect(
+            events,
+            contains(
+              isA<HitWall>().having((e) => e.speed, 'speed', greaterThan(0)),
+            ),
+          );
+          await subscription.cancel();
+        },
+      );
+
+      test('a marble resting on the floor emits no HitWall', () async {
+        final events = <SimulationEvent>[];
+        final subscription = harness.simulation.events.listen(events.add);
+        final restY = harness.simulation.marble.position.y;
+        harness.handle.placeMarble(Vector3(_wallX - 2, restY + 0.3, 0));
+
+        _stepFor(harness.simulation, Tilt.flat, _settleTime);
+        await pumpEventQueue();
+
+        expect(events, isNot(contains(isA<HitWall>())));
+        await subscription.cancel();
+      });
     });
 
     group('holes', () {

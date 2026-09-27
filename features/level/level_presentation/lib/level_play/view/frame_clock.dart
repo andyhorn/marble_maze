@@ -14,10 +14,15 @@ class FrameClock {
 
   Duration _lastTimestamp = Duration.zero;
   Duration _activeElapsed = Duration.zero;
+  Duration _totalElapsed = Duration.zero;
 
   /// The accumulated duration across every [tick] called with
   /// `isActive: true`, unaffected by ticks while inactive.
   Duration get activeElapsed => _activeElapsed;
+
+  /// The accumulated duration across every [tick], active or not, with
+  /// each frame's delta clamped to [maxDelta].
+  Duration get totalElapsed => _totalElapsed;
 
   /// Advances the clock to [timestamp] (a ticker's cumulative elapsed time)
   /// and returns this frame's delta, clamped to [maxDelta]. If [isActive],
@@ -28,6 +33,7 @@ class FrameClock {
     final delta = raw.isNegative
         ? Duration.zero
         : (raw > maxDelta ? maxDelta : raw);
+    _totalElapsed += delta;
     if (isActive) _activeElapsed += delta;
     return delta;
   }
