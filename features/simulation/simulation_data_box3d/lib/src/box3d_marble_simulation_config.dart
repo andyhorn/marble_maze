@@ -4,14 +4,14 @@ import 'package:simulation_domain/simulation_domain.dart';
 class Box3dMarbleSimulationConfig {
   /// Creates a config. See each field for its meaning.
   const new({
-    this.gravityMagnitude = 9.81 * 1.5,
+    this.gravityMagnitude = 9.81 * 13,
     this.marbleRadius = kMarbleRadius,
     this.wallHeight = kWallHeight,
     this.wallThickness = 0.2,
     this.floorThickness = 0.5,
     this.holeTriggerRadius = kHoleRadius,
     this.exitTriggerRadius = kExitRadius,
-    this.linearDamping = 0.3,
+    this.linearDamping = 3.5,
     this.angularDamping = 0.05,
     this.fixedTimestepSeconds = 1 / 120,
     this.maxStepElapsed = const Duration(milliseconds: 100),
@@ -24,8 +24,19 @@ class Box3dMarbleSimulationConfig {
       Box3dMarbleSimulationConfig();
 
   /// Gravity's magnitude, in units per second squared, at zero tilt.
-  /// `9.81 * 1.5`: 1.5x Earth gravity, tuned for how fast the marble should
-  /// feel accelerating on a phone-sized board, not a real-world value.
+  ///
+  /// `9.81 * 13`: tuned jointly with [linearDamping], not a real-world
+  /// value. The marble is a rolling sphere, so its terminal speed at a given
+  /// tilt is roughly `gravityMagnitude * sin(tilt) / linearDamping`, and the
+  /// ratio between the 15° and 5° terminal speeds is fixed by that formula
+  /// (`sin(15°) / sin(5°) ≈ 3`). Capping the 15° terminal speed at 10 u/s
+  /// (so the marble stays controllable at max tilt) therefore caps the 5°
+  /// terminal speed too, which in turn caps how fast the marble can spin up
+  /// from rest. Reaching a responsive-feeling 2 u/s within 0.5s of a 5°
+  /// tilt needs gravity around this magnitude; a true-to-scale value
+  /// (~9.81 * 6, given a 1.5cm real cell per grid unit) is too weak to hit
+  /// that target under any linearDamping that also keeps top speed in
+  /// range.
   final double gravityMagnitude;
 
   /// The marble's collision radius.
@@ -48,9 +59,19 @@ class Box3dMarbleSimulationConfig {
 
   /// Linear damping applied to the marble, approximating rolling
   /// resistance.
+  ///
+  /// Tuned jointly with [gravityMagnitude]: this is what bounds the
+  /// marble's terminal speed at full tilt (see [gravityMagnitude]'s doc),
+  /// and its reciprocal sets roughly how fast the marble spins up from rest
+  /// or reverses direction.
   final double linearDamping;
 
   /// Angular damping applied to the marble.
+  ///
+  /// Left low: once rolling, spin damping acts on the marble's linear speed
+  /// like extra [linearDamping] at roughly 0.4x weight, so [linearDamping]
+  /// is the primary knob for both terminal speed and how fast the marble
+  /// changes direction.
   final double angularDamping;
 
   /// The internal fixed physics timestep, in seconds.
