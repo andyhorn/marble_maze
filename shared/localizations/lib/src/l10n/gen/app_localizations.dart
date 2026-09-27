@@ -222,6 +222,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Resume'**
   String get levelPlayResume;
+
+  /// Title shown at startup when Flutter GPU is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'This device isn\'t supported'**
+  String get unsupportedDeviceTitle;
+
+  /// Message shown at startup when Flutter GPU is unavailable
+  ///
+  /// In en, this message translates to:
+  /// **'Marble Maze needs graphics hardware this device doesn\'t have.'**
+  String get unsupportedDeviceMessage;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

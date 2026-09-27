@@ -103,5 +103,13 @@
     "levelPlayResume": "Reanudar",
     "@levelPlayResume": {
         "description": "Botón de la pantalla de pausa que reanuda el nivel"
+    },
+    "unsupportedDeviceTitle": "Este dispositivo no es compatible",
+    "@unsupportedDeviceTitle": {
+        "description": "Título que se muestra al iniciar cuando Flutter GPU no está disponible"
+    },
+    "unsupportedDeviceMessage": "Laberinto de canicas necesita hardware gráfico que este dispositivo no tiene.",
+    "@unsupportedDeviceMessage": {
+        "description": "Mensaje que se muestra al iniciar cuando Flutter GPU no está disponible"
     }
 }

@@ -103,5 +103,13 @@
     "levelPlayResume": "Resume",
     "@levelPlayResume": {
         "description": "Button on the paused overlay that resumes the level"
+    },
+    "unsupportedDeviceTitle": "This device isn't supported",
+    "@unsupportedDeviceTitle": {
+        "description": "Title shown at startup when Flutter GPU is unavailable"
+    },
+    "unsupportedDeviceMessage": "Marble Maze needs graphics hardware this device doesn't have.",
+    "@unsupportedDeviceMessage": {
+        "description": "Message shown at startup when Flutter GPU is unavailable"
     }
 }

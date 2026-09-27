@@ -81,4 +81,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get levelPlayResume => 'Resume';
+
+  @override
+  String get unsupportedDeviceTitle => 'This device isn\'t supported';
+
+  @override
+  String get unsupportedDeviceMessage => 'Marble Maze needs graphics hardware this device doesn\'t have.';
 }

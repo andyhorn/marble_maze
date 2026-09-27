@@ -81,4 +81,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get levelPlayResume => 'Reanudar';
+
+  @override
+  String get unsupportedDeviceTitle => 'Este dispositivo no es compatible';
+
+  @override
+  String get unsupportedDeviceMessage => 'Laberinto de canicas necesita hardware gráfico que este dispositivo no tiene.';
 }
