@@ -1,4 +1,5 @@
 import 'dart:async';
+import 'dart:developer' show Timeline, TimelineTask;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
@@ -272,14 +273,46 @@ class _BoardSceneViewState extends State<BoardSceneView>
     }
   }
 
+  /// Runs [body] as a named span of [task], so each loading stage shows up
+  /// on the DevTools performance timeline next to the frame timings.
+  static Future<T> _traceStage<T>(
+    TimelineTask task,
+    String name,
+    Future<T> Function() body,
+  ) async {
+    task.start(name);
+    try {
+      return await body();
+    } finally {
+      task.finish();
+    }
+  }
+
   Future<void> _buildScene() async {
+    final task = TimelineTask()..start('BoardSceneView.load');
+    try {
+      await _loadScene(task);
+    } finally {
+      task.finish();
+    }
+  }
+
+  Future<void> _loadScene(TimelineTask task) async {
     // Geometry and materials need the shader bundle, which is only
     // available once the engine's static resources are loaded.
-    await Scene.initializeStaticResources();
+    await _traceStage(
+      task,
+      'initializeStaticResources',
+      Scene.initializeStaticResources,
+    );
 
-    final textures = await BoardTextures.load();
+    final textures = await _traceStage(
+      task,
+      'loadTextures',
+      BoardTextures.load,
+    );
 
-    _buildBoard(textures);
+    Timeline.timeSync('buildBoard', () => _buildBoard(textures));
     _marbleNode = Node(
       mesh: Mesh(
         SphereGeometry(radius: kMarbleRadius),
@@ -317,15 +350,19 @@ class _BoardSceneViewState extends State<BoardSceneView>
       ..ambientOcclusion.enabled = true
       ..ambientOcclusion.intensity = _ambientOcclusionIntensity
       ..ambientOcclusion.directLightAffect = _ambientOcclusionDirectLightAffect;
-    await _scene.loadEnvironment(
-      _environmentAsset,
-      // The camera always looks straight down and cover-fits the board to
-      // the viewport, so the sky is never seen; disabling it is a cheap
-      // saving.
-      showSkybox: false,
-      // Dimmed well below the directional light's contribution, so cast
-      // shadows read clearly instead of being washed out by ambient IBL.
-      intensity: _environmentIntensity,
+    await _traceStage(
+      task,
+      'loadEnvironment',
+      () => _scene.loadEnvironment(
+        _environmentAsset,
+        // The camera always looks straight down and cover-fits the board to
+        // the viewport, so the sky is never seen; disabling it is a cheap
+        // saving.
+        showSkybox: false,
+        // Dimmed well below the directional light's contribution, so cast
+        // shadows read clearly instead of being washed out by ambient IBL.
+        intensity: _environmentIntensity,
+      ),
     );
 
     if (!mounted) return;
