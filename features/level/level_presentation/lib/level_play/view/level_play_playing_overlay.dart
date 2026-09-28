@@ -1,11 +1,13 @@
 import 'package:level_presentation/level_play/cubit/level_play_cubit.dart';
 import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
+import 'package:level_presentation/level_play/view/level_play_bubble_level.dart';
 import 'package:level_presentation/level_play/view/level_play_hud.dart';
 import 'package:level_presentation/level_play/view/level_play_tilt_hint.dart';
 import 'package:material_ui/material_ui.dart';
 
-/// The overlay shown while the level is playing or falling: the HUD, plus
-/// the "drag to tilt" hint while [controller] is showing it.
+/// The overlay shown while the level is playing or falling: the HUD, the
+/// bubble level, plus the "drag to tilt" hint while [controller] is showing
+/// it.
 class LevelPlayPlayingOverlay extends StatelessWidget {
   /// Creates a level play playing overlay.
   const new({
@@ -33,6 +35,7 @@ class LevelPlayPlayingOverlay extends StatelessWidget {
     return Stack(
       children: [
         LevelPlayHud(cubit: cubit, title: title, onPause: onPause),
+        const LevelPlayBubbleLevel(),
         ListenableBuilder(
           listenable: controller,
           builder: (context, _) => controller.showHint

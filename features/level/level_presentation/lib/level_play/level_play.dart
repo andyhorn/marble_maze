@@ -8,6 +8,7 @@ export 'input/level_play_input_controller.dart';
 export 'lighting/board_light.dart';
 export 'view/board_scene_view.dart';
 export 'view/frame_clock.dart';
+export 'view/level_play_bubble_level.dart';
 export 'view/level_play_error_view.dart';
 export 'view/level_play_hud.dart';
 export 'view/level_play_loading_view.dart';
