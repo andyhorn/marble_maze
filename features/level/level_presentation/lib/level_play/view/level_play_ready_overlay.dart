@@ -31,7 +31,7 @@ class LevelPlayReadyOverlay extends StatelessWidget {
               child: Text(l10n.levelPlayTapToStart),
             ),
             const SizedBox(height: 8),
-            SecondaryButton(
+            FilledButton.tonal(
               onPressed: onBackToLevels,
               child: Text(l10n.backToLevels),
             ),
