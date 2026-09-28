@@ -1,4 +1,3 @@
-import 'package:flutter_bloc/flutter_bloc.dart';
 import 'package:flutter_test/flutter_test.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_presentation.dart';
@@ -21,8 +20,7 @@ class _FakeTiltRepository implements ITiltRepository {
   Future<bool> isAvailable() async => isAvailableResult;
 
   @override
-  Stream<RawGravity> watchGravity() =>
-      Stream.value(const RawGravity(x: 0, y: 0, z: 9.81));
+  Stream<RawGravity> watchGravity() => Stream.value(RawGravity.flat);
 }
 
 void main() {
@@ -59,14 +57,11 @@ void main() {
       await controller.initialize();
 
       await tester.pumpApp(
-        RepositoryProvider<ITiltRepository>.value(
-          value: repository,
-          child: LevelPlayPlayingOverlay(
-            cubit: cubit,
-            title: 'First Roll',
-            controller: controller,
-            onPause: () {},
-          ),
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
         ),
       );
 
@@ -82,14 +77,11 @@ void main() {
       await controller.initialize();
 
       await tester.pumpApp(
-        RepositoryProvider<ITiltRepository>.value(
-          value: repository,
-          child: LevelPlayPlayingOverlay(
-            cubit: cubit,
-            title: 'First Roll',
-            controller: controller,
-            onPause: () {},
-          ),
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
         ),
       );
 
@@ -104,14 +96,11 @@ void main() {
       await controller.initialize();
 
       await tester.pumpApp(
-        RepositoryProvider<ITiltRepository>.value(
-          value: repository,
-          child: LevelPlayPlayingOverlay(
-            cubit: cubit,
-            title: 'First Roll',
-            controller: controller,
-            onPause: () {},
-          ),
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
         ),
       );
       controller.dragStart(0, 0);
@@ -129,14 +118,11 @@ void main() {
       var paused = false;
 
       await tester.pumpApp(
-        RepositoryProvider<ITiltRepository>.value(
-          value: repository,
-          child: LevelPlayPlayingOverlay(
-            cubit: cubit,
-            title: 'First Roll',
-            controller: controller,
-            onPause: () => paused = true,
-          ),
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () => paused = true,
         ),
       );
       await tester.tap(find.byIcon(Icons.pause));
@@ -145,27 +131,53 @@ void main() {
       controller.dispose();
     });
 
-    testWidgets('shows the bubble level once the accelerometer reports', (
+    testWidgets('shows the bubble level even with touch-only input', (
       tester,
     ) async {
-      final repository = _FakeTiltRepository();
+      final repository = _FakeTiltRepository()..isAvailableResult = false;
       controller = LevelPlayInputController(repository: repository);
       await controller.initialize();
 
       await tester.pumpApp(
-        RepositoryProvider<ITiltRepository>.value(
-          value: repository,
-          child: LevelPlayPlayingOverlay(
-            cubit: cubit,
-            title: 'First Roll',
-            controller: controller,
-            onPause: () {},
-          ),
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
         ),
       );
-      await tester.pump();
 
       expect(find.byType(BubbleLevelGauge), findsOneWidget);
+      controller.dispose();
+    });
+
+    testWidgets('the bubble floats opposite the way the board rolls the '
+        'marble', (tester) async {
+      final repository = _FakeTiltRepository()..isAvailableResult = false;
+      controller = LevelPlayInputController(repository: repository);
+      await controller.initialize();
+      await tester.pumpApp(
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
+        ),
+      );
+
+      controller
+        ..dragStart(0, 0)
+        ..dragUpdate(60, 0);
+      final applied = controller.tilt;
+      await tester.pump();
+
+      final gauge = tester.widget<BubbleLevelGauge>(
+        find.byType(BubbleLevelGauge),
+      );
+      expect(applied.x, greaterThan(0));
+      expect(gauge.xAngle, -applied.x);
+      expect(gauge.fullScaleAngle, Tilt.maxTilt);
+      controller.dispose();
     });
   });
 }

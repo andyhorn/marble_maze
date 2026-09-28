@@ -13,11 +13,14 @@ import 'package:marble_maze_app/app/view/unsupported_device_app.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:progress_data_shared_preferences/progress_data_shared_preferences.dart';
 import 'package:progress_domain/progress_domain.dart';
+import 'package:settings_data_shared_preferences/settings_data_shared_preferences.dart';
+import 'package:settings_domain/settings_domain.dart';
 import 'package:tilt_data_sensors_plus/tilt_data_sensors_plus.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
 /// Builds the app: a [LevelsRepository] reading bundled level assets, a
 /// [SharedPreferencesProgressRepository] for saved best times, a
+/// [SharedPreferencesSettingsRepository] for saved settings, a
 /// [SensorsPlusTiltRepository] for tilt input, and the typed [GoRouter]
 /// routes.
 ///
@@ -50,6 +53,7 @@ Future<Widget> buildApp({
     dataSource: AssetLevelDataSource(loader: rootBundle.loadString),
   );
   final progressRepository = SharedPreferencesProgressRepository();
+  final settingsRepository = SharedPreferencesSettingsRepository();
   final tiltRepository = SensorsPlusTiltRepository();
   final router = GoRouter(
     routes: $appRoutes,
@@ -60,6 +64,7 @@ Future<Widget> buildApp({
     providers: [
       RepositoryProvider<ILevelsRepository>.value(value: levelsRepository),
       RepositoryProvider<IProgressRepository>.value(value: progressRepository),
+      RepositoryProvider<ISettingsRepository>.value(value: settingsRepository),
       RepositoryProvider<ITiltRepository>.value(value: tiltRepository),
     ],
     child: App(router: router),

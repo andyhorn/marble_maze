@@ -40,7 +40,7 @@ void main() {
       // subscription attach, so the reading below isn't dropped by the
       // broadcast stream having no listener yet.
       await tester.pump();
-      repository.gravityController.add(const RawGravity(x: 0, y: 0, z: 9.81));
+      repository.gravityController.add(RawGravity.flat);
       await initializing;
 
       expect(controller.useAccelerometer, isTrue);
@@ -107,7 +107,7 @@ void main() {
       controller = LevelPlayInputController(repository: repository);
       final initializing = controller.initialize();
       await tester.pump();
-      repository.gravityController.add(const RawGravity(x: 0, y: 0, z: 9.81));
+      repository.gravityController.add(RawGravity.flat);
       await initializing;
 
       controller
@@ -124,7 +124,7 @@ void main() {
       controller = LevelPlayInputController(repository: repository);
       final initializing = controller.initialize();
       await tester.pump();
-      repository.gravityController.add(const RawGravity(x: 0, y: 0, z: 9.81));
+      repository.gravityController.add(RawGravity.flat);
       await initializing;
 
       controller
@@ -146,6 +146,38 @@ void main() {
       controller.calibrate();
 
       expect(controller.tilt, Tilt.flat);
+    });
+
+    testWidgets('calibrate without toHeldAngle measures tilt from flat', (
+      tester,
+    ) async {
+      controller = LevelPlayInputController(repository: repository);
+      final initializing = controller.initialize();
+      await tester.pump();
+      repository.gravityController.add(const RawGravity(x: -2, y: 0, z: 9.6));
+      await initializing;
+
+      controller.calibrate(toHeldAngle: false);
+
+      expect(controller.tilt.x, greaterThan(0));
+      expect(controller.tilt.y, 0);
+    });
+
+    testWidgets('lastTilt is flat until tilt is read, then follows it', (
+      tester,
+    ) async {
+      repository.isAvailableResult = false;
+      controller = LevelPlayInputController(repository: repository);
+      await controller.initialize();
+      expect(controller.lastTilt, Tilt.flat);
+
+      controller
+        ..dragStart(0, 0)
+        ..dragUpdate(60, 0);
+      final applied = controller.tilt;
+
+      expect(controller.lastTilt, applied);
+      controller.dispose();
     });
   });
 }

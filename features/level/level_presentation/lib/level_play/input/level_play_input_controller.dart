@@ -43,6 +43,7 @@ class LevelPlayInputController extends ChangeNotifier {
   RawGravity? _latestGravity;
   bool _useAccelerometer = false;
   bool _showHint = false;
+  Tilt _lastTilt = Tilt.flat;
 
   /// Whether the accelerometer is the active input source (subject to the
   /// touch override below).
@@ -54,14 +55,26 @@ class LevelPlayInputController extends ChangeNotifier {
   /// The board's current tilt: touch while a finger is down, otherwise the
   /// accelerometer if available, otherwise touch (including its
   /// release-ease).
+  ///
+  /// Reading this advances the accelerometer's smoothing, so it is meant to
+  /// be read once per frame by the board; anything else that only wants to
+  /// display the tilt should read [lastTilt].
   Tilt get tilt {
-    if (_touchTiltMapper.isDragging) return _touchTiltMapper.tilt;
-    if (_useAccelerometer) {
+    final Tilt current;
+    if (_touchTiltMapper.isDragging) {
+      current = _touchTiltMapper.tilt;
+    } else if (_useAccelerometer) {
       final gravity = _latestGravity;
-      return gravity == null ? Tilt.flat : _tiltFilter.filter(gravity);
+      current = gravity == null ? Tilt.flat : _tiltFilter.filter(gravity);
+    } else {
+      current = _touchTiltMapper.tilt;
     }
-    return _touchTiltMapper.tilt;
+    return _lastTilt = current;
   }
+
+  /// The tilt most recently returned by [tilt], without advancing any
+  /// smoothing. [Tilt.flat] until the board first reads [tilt].
+  Tilt get lastTilt => _lastTilt;
 
   /// Probes the accelerometer and settles [useAccelerometer] and
   /// [showHint]. Call once per level-play visit, before [tilt] is read.
@@ -116,10 +129,17 @@ class LevelPlayInputController extends ChangeNotifier {
     notifyListeners();
   }
 
-  /// Calibrates the accelerometer's neutral orientation from the latest
-  /// gravity reading. A no-op if using touch only or no reading has arrived
-  /// yet.
-  void calibrate() {
+  /// Sets the accelerometer's neutral orientation.
+  ///
+  /// With [toHeldAngle] (the default), the latest gravity reading becomes
+  /// neutral, so however the device is held counts as flat; a no-op if no
+  /// reading has arrived yet. Without it, a device lying flat is neutral
+  /// and tilt is measured as it physically is.
+  void calibrate({bool toHeldAngle = true}) {
+    if (!toHeldAngle) {
+      _tiltFilter.calibrate(RawGravity.flat);
+      return;
+    }
     final gravity = _latestGravity;
     if (gravity != null) _tiltFilter.calibrate(gravity);
   }

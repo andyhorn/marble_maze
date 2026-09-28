@@ -112,9 +112,25 @@
     "@unsupportedDeviceMessage": {
         "description": "Mensaje que se muestra al iniciar cuando Flutter GPU no está disponible"
     },
-    "bubbleLevelTooltip": "Nivel de burbuja",
-    "@bubbleLevelTooltip": {
-        "description": "Información sobre herramientas del botón de selección de nivel que abre el nivel de burbuja"
+    "settingsTooltip": "Ajustes",
+    "@settingsTooltip": {
+        "description": "Información sobre herramientas del botón de selección de nivel que abre los ajustes"
+    },
+    "settingsTitle": "Ajustes",
+    "@settingsTitle": {
+        "description": "Título de la pantalla de ajustes"
+    },
+    "settingsCalibrateTiltTitle": "Calibrar según cómo sostengo el dispositivo",
+    "@settingsCalibrateTiltTitle": {
+        "description": "Título del ajuste que calibra la inclinación al ángulo con que se sostiene el dispositivo"
+    },
+    "settingsCalibrateTiltSubtitle": "Desactivado mide la inclinación desde la horizontal, así que juega con el dispositivo plano.",
+    "@settingsCalibrateTiltSubtitle": {
+        "description": "Explica qué hace desactivar la calibración de la inclinación"
+    },
+    "settingsBubbleLevel": "Nivel de burbuja",
+    "@settingsBubbleLevel": {
+        "description": "Fila de ajustes que abre la pantalla del nivel de burbuja"
     },
     "bubbleLevelTitle": "Nivel de burbuja",
     "@bubbleLevelTitle": {

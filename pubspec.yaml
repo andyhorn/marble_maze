@@ -11,6 +11,8 @@ workspace:
   - features/level/level_presentation
   - features/progress/progress_data_shared_preferences
   - features/progress/progress_domain
+  - features/settings/settings_data_shared_preferences
+  - features/settings/settings_domain
   - features/simulation/simulation_domain
   - features/simulation/simulation_data_box3d
   - features/tilt/tilt_data_sensors_plus

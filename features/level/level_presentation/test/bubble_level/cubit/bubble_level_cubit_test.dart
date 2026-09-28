@@ -35,7 +35,7 @@ void main() {
     });
 
     test('reads a device lying flat as zero tilt', () async {
-      gravity.add(const RawGravity(x: 0, y: 0, z: 9.81));
+      gravity.add(RawGravity.flat);
       await Future<void>.delayed(Duration.zero);
 
       expect(cubit.state.hasReading, isTrue);
@@ -54,7 +54,7 @@ void main() {
 
     test('smooths later readings toward the new angle', () async {
       const angle = 10 * math.pi / 180;
-      gravity.add(const RawGravity(x: 0, y: 0, z: 9.81));
+      gravity.add(RawGravity.flat);
       await Future<void>.delayed(Duration.zero);
       gravity.add(_tiltedRight(angle));
       await Future<void>.delayed(Duration.zero);

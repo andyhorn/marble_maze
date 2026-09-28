@@ -89,7 +89,19 @@ class AppLocalizationsEs extends AppLocalizations {
   String get unsupportedDeviceMessage => 'Laberinto de canicas necesita hardware gráfico que este dispositivo no tiene.';
 
   @override
-  String get bubbleLevelTooltip => 'Nivel de burbuja';
+  String get settingsTooltip => 'Ajustes';
+
+  @override
+  String get settingsTitle => 'Ajustes';
+
+  @override
+  String get settingsCalibrateTiltTitle => 'Calibrar según cómo sostengo el dispositivo';
+
+  @override
+  String get settingsCalibrateTiltSubtitle => 'Desactivado mide la inclinación desde la horizontal, así que juega con el dispositivo plano.';
+
+  @override
+  String get settingsBubbleLevel => 'Nivel de burbuja';
 
   @override
   String get bubbleLevelTitle => 'Nivel de burbuja';

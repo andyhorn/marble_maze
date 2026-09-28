@@ -15,6 +15,7 @@ import 'package:level_presentation/level_play/view/level_play_view.dart';
 import 'package:level_presentation/level_play/view/level_play_won_overlay.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:progress_domain/progress_domain.dart';
+import 'package:settings_domain/settings_domain.dart';
 import 'package:simulation_domain/simulation_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
@@ -111,6 +112,7 @@ class _LevelPlayModuleBody extends StatefulWidget {
 class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   IMarbleSimulation? _simulation;
   bool _isSceneReady = false;
+  bool _calibrateTilt = true;
   late final LevelPlayInputController _controller;
   late final AppLifecycleListener _lifecycleListener;
 
@@ -124,11 +126,19 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
       repository: context.read<ITiltRepository>(),
     );
     unawaited(_controller.initialize());
+    unawaited(_loadCalibrateTilt());
     // Only pauses: the player must tap Resume, so returning to the
     // foreground never restarts the timer or physics on its own.
     _lifecycleListener = AppLifecycleListener(
       onStateChange: _onAppLifecycleStateChanged,
     );
+  }
+
+  Future<void> _loadCalibrateTilt() async {
+    final calibrateTilt = await context
+        .read<ISettingsRepository>()
+        .getCalibrateTilt();
+    if (mounted) _calibrateTilt = calibrateTilt;
   }
 
   void _onAppLifecycleStateChanged(AppLifecycleState state) {
@@ -157,7 +167,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   }
 
   void _onStart(LevelPlayCubit cubit) {
-    _controller.calibrate();
+    _controller.calibrate(toHeldAngle: _calibrateTilt);
     cubit.start();
   }
 

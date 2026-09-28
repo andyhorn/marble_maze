@@ -235,11 +235,35 @@ abstract class AppLocalizations {
   /// **'Marble Maze needs graphics hardware this device doesn\'t have.'**
   String get unsupportedDeviceMessage;
 
-  /// Tooltip of the level select button that opens the bubble level
+  /// Tooltip of the level select button that opens settings
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTooltip;
+
+  /// Title of the settings screen
+  ///
+  /// In en, this message translates to:
+  /// **'Settings'**
+  String get settingsTitle;
+
+  /// Title of the setting that calibrates tilt input to the angle the device is held at
+  ///
+  /// In en, this message translates to:
+  /// **'Calibrate to how I hold the device'**
+  String get settingsCalibrateTiltTitle;
+
+  /// Explains what turning off tilt calibration does
+  ///
+  /// In en, this message translates to:
+  /// **'Off measures tilt from flat, so play with the device lying flat.'**
+  String get settingsCalibrateTiltSubtitle;
+
+  /// Settings row that opens the bubble level screen
   ///
   /// In en, this message translates to:
   /// **'Bubble level'**
-  String get bubbleLevelTooltip;
+  String get settingsBubbleLevel;
 
   /// Title of the bubble level screen
   ///

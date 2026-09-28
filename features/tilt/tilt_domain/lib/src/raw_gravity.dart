@@ -14,6 +14,10 @@ class RawGravity {
   /// No reading recorded yet.
   static const RawGravity zero = RawGravity(x: 0, y: 0, z: 0);
 
+  /// A device lying flat and still, face up: gravity entirely along the
+  /// out-of-screen axis.
+  static const RawGravity flat = RawGravity(x: 0, y: 0, z: 9.81);
+
   /// Acceleration along the device's x axis (screen right), in m/s^2.
   final double x;
 

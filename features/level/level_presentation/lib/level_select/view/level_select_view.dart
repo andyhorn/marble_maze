@@ -19,19 +19,19 @@ import 'package:material_ui/material_ui.dart';
 /// restart.
 class LevelSelectView extends StatefulWidget {
   /// Creates a level select view. [onLevelSelected] is called with a
-  /// level's id when its row is tapped, and [onOpenBubbleLevel] when the
-  /// app bar's bubble level button is tapped.
+  /// level's id when its row is tapped, and [onOpenSettings] when the app
+  /// bar's settings button is tapped.
   const new({
     required this.onLevelSelected,
-    required this.onOpenBubbleLevel,
+    required this.onOpenSettings,
     super.key,
   });
 
   /// Called when the player taps a level's row.
   final ValueChanged<String> onLevelSelected;
 
-  /// Called when the player taps the bubble level button.
-  final VoidCallback onOpenBubbleLevel;
+  /// Called when the player taps the settings button.
+  final VoidCallback onOpenSettings;
 
   @override
   State<LevelSelectView> createState() => _LevelSelectViewState();
@@ -68,9 +68,9 @@ class _LevelSelectViewState extends State<LevelSelectView> with RouteAware {
             title: Text(context.l10n.levelSelectTitle),
             actions: [
               IconButton(
-                icon: const Icon(Icons.straighten),
-                tooltip: context.l10n.bubbleLevelTooltip,
-                onPressed: widget.onOpenBubbleLevel,
+                icon: const Icon(Icons.settings),
+                tooltip: context.l10n.settingsTooltip,
+                onPressed: widget.onOpenSettings,
               ),
             ],
           ),

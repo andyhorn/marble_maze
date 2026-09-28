@@ -26,7 +26,7 @@ void main() {
 
     Widget buildSubject({
       ValueChanged<String>? onLevelSelected,
-      VoidCallback? onOpenBubbleLevel,
+      VoidCallback? onOpenSettings,
     }) {
       return RepositoryProvider<ILevelsRepository>.value(
         value: levelsRepository,
@@ -34,7 +34,7 @@ void main() {
           value: progressRepository,
           child: LevelSelectModule(
             onLevelSelected: onLevelSelected ?? (_) {},
-            onOpenBubbleLevel: onOpenBubbleLevel ?? () {},
+            onOpenSettings: onOpenSettings ?? () {},
           ),
         ),
       );
@@ -86,8 +86,9 @@ void main() {
       expect(selected, 'first_roll');
     });
 
-    testWidgets('calls onOpenBubbleLevel when the bubble level button is '
-        'tapped', (tester) async {
+    testWidgets('calls onOpenSettings when the settings button is tapped', (
+      tester,
+    ) async {
       var opened = false;
       when(() => levelsRepository.getManifest()).thenAnswer(
         (_) async => const [
@@ -96,11 +97,9 @@ void main() {
       );
       when(() => progressRepository.getRecords()).thenAnswer((_) async => {});
 
-      await tester.pumpApp(
-        buildSubject(onOpenBubbleLevel: () => opened = true),
-      );
+      await tester.pumpApp(buildSubject(onOpenSettings: () => opened = true));
       await tester.pumpAndSettle();
-      await tester.tap(find.byTooltip('Bubble level'));
+      await tester.tap(find.byTooltip('Settings'));
 
       expect(opened, isTrue);
     });

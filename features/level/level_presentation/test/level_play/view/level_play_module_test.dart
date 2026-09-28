@@ -7,6 +7,7 @@ import 'package:level_presentation/level_presentation.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:progress_domain/progress_domain.dart';
+import 'package:settings_domain/settings_domain.dart';
 import 'package:simulation_domain/simulation_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 import 'package:vector_math/vector_math.dart';
@@ -25,6 +26,14 @@ class _FakeTiltRepository implements ITiltRepository {
 
   @override
   Stream<RawGravity> watchGravity() => const Stream.empty();
+}
+
+class _FakeSettingsRepository implements ISettingsRepository {
+  @override
+  Future<bool> getCalibrateTilt() async => true;
+
+  @override
+  Future<void> setCalibrateTilt({required bool value}) async {}
 }
 
 class _FakeMarbleSimulation implements IMarbleSimulation {
@@ -113,6 +122,9 @@ void main() {
           ),
           RepositoryProvider<ITiltRepository>.value(
             value: _FakeTiltRepository(),
+          ),
+          RepositoryProvider<ISettingsRepository>.value(
+            value: _FakeSettingsRepository(),
           ),
         ],
         child: LevelPlayModule(

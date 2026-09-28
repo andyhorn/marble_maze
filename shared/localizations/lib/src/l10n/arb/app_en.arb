@@ -112,9 +112,25 @@
     "@unsupportedDeviceMessage": {
         "description": "Message shown at startup when Flutter GPU is unavailable"
     },
-    "bubbleLevelTooltip": "Bubble level",
-    "@bubbleLevelTooltip": {
-        "description": "Tooltip of the level select button that opens the bubble level"
+    "settingsTooltip": "Settings",
+    "@settingsTooltip": {
+        "description": "Tooltip of the level select button that opens settings"
+    },
+    "settingsTitle": "Settings",
+    "@settingsTitle": {
+        "description": "Title of the settings screen"
+    },
+    "settingsCalibrateTiltTitle": "Calibrate to how I hold the device",
+    "@settingsCalibrateTiltTitle": {
+        "description": "Title of the setting that calibrates tilt input to the angle the device is held at"
+    },
+    "settingsCalibrateTiltSubtitle": "Off measures tilt from flat, so play with the device lying flat.",
+    "@settingsCalibrateTiltSubtitle": {
+        "description": "Explains what turning off tilt calibration does"
+    },
+    "settingsBubbleLevel": "Bubble level",
+    "@settingsBubbleLevel": {
+        "description": "Settings row that opens the bubble level screen"
     },
     "bubbleLevelTitle": "Bubble level",
     "@bubbleLevelTitle": {

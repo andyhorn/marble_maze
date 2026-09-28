@@ -43,7 +43,7 @@ void main() {
                 value: progressRepository,
                 child: LevelSelectModule(
                   onLevelSelected: (id) {},
-                  onOpenBubbleLevel: () {},
+                  onOpenSettings: () {},
                 ),
               ),
             ),

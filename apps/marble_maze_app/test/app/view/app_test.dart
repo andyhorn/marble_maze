@@ -10,6 +10,7 @@ import 'package:marble_maze_app/app/routes/app_routes.dart';
 import 'package:material_ui/material_ui.dart';
 import 'package:mocktail/mocktail.dart';
 import 'package:progress_domain/progress_domain.dart';
+import 'package:settings_domain/settings_domain.dart';
 import 'package:tilt_domain/tilt_domain.dart';
 
 class _MockLevelsRepository extends Mock implements ILevelsRepository;
@@ -24,6 +25,14 @@ class _FakeTiltRepository implements ITiltRepository {
 
   @override
   Stream<RawGravity> watchGravity() => const Stream.empty();
+}
+
+class _FakeSettingsRepository implements ISettingsRepository {
+  @override
+  Future<bool> getCalibrateTilt() async => true;
+
+  @override
+  Future<void> setCalibrateTilt({required bool value}) async {}
 }
 
 void main() {
@@ -52,6 +61,9 @@ void main() {
           RepositoryProvider<ITiltRepository>.value(
             value: _FakeTiltRepository(),
           ),
+          RepositoryProvider<ISettingsRepository>.value(
+            value: _FakeSettingsRepository(),
+          ),
         ],
         child: App(router: router ?? GoRouter(routes: $appRoutes)),
       );
@@ -64,6 +76,22 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.text('First Roll'), findsOneWidget);
+    });
+
+    testWidgets('opens settings, then the bubble level, from level select', (
+      tester,
+    ) async {
+      await tester.pumpWidget(buildSubject());
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Settings'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(SettingsView), findsOneWidget);
+
+      await tester.tap(find.text('Bubble level'));
+      await tester.pumpAndSettle();
+
+      expect(find.byType(BubbleLevelView), findsOneWidget);
     });
 
     testWidgets('opens the level play route from level select', (tester) async {

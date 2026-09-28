@@ -15,6 +15,18 @@ class LevelSelectRoute extends GoRouteData with $LevelSelectRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) => LevelSelectModule(
     onLevelSelected: (id) => LevelPlayRoute(id: id).push<void>(context),
+    onOpenSettings: () => const SettingsRoute().push<void>(context),
+  );
+}
+
+/// The settings route: tilt calibration, and a link to the bubble level.
+@TypedGoRoute<SettingsRoute>(path: '/settings')
+class SettingsRoute extends GoRouteData with $SettingsRoute {
+  /// Creates the settings route.
+  const new();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) => SettingsModule(
     onOpenBubbleLevel: () => const BubbleLevelRoute().push<void>(context),
   );
 }

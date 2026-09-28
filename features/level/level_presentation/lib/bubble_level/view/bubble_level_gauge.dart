@@ -5,8 +5,14 @@ import 'package:material_ui/material_ui.dart';
 /// The bubble level's circular vial: crosshair, target ring and a bubble
 /// that floats toward the high side of the device.
 class BubbleLevelGauge extends StatelessWidget {
-  /// Creates a gauge for a device tilted by [xAngle] and [yAngle] radians.
-  const new({required this.xAngle, required this.yAngle, super.key});
+  /// Creates a gauge for a device tilted by [xAngle] and [yAngle] radians,
+  /// with the bubble reaching the vial's edge at [fullScaleAngle].
+  const new({
+    required this.xAngle,
+    required this.yAngle,
+    this.fullScaleAngle = defaultFullScaleAngle,
+    super.key,
+  });
 
   /// The tilt about the screen's vertical axis; positive is right edge up.
   final double xAngle;
@@ -14,9 +20,11 @@ class BubbleLevelGauge extends StatelessWidget {
   /// The tilt about the screen's horizontal axis; positive is top edge up.
   final double yAngle;
 
-  /// The tilt, in radians, at which the bubble reaches the vial's edge
-  /// (25 degrees).
-  static const double fullScaleAngle = 25 * math.pi / 180;
+  /// The default [fullScaleAngle], 25 degrees.
+  static const double defaultFullScaleAngle = 25 * math.pi / 180;
+
+  /// The tilt, in radians, at which the bubble reaches the vial's edge.
+  final double fullScaleAngle;
 
   @override
   Widget build(BuildContext context) {
@@ -27,6 +35,7 @@ class BubbleLevelGauge extends StatelessWidget {
         painter: _GaugePainter(
           xAngle: xAngle,
           yAngle: yAngle,
+          fullScaleAngle: fullScaleAngle,
           vialColor: colors.surfaceContainerHighest,
           lineColor: colors.outline,
           bubbleColor: colors.primary,
@@ -40,6 +49,7 @@ class _GaugePainter extends CustomPainter {
   new({
     required this.xAngle,
     required this.yAngle,
+    required this.fullScaleAngle,
     required this.vialColor,
     required this.lineColor,
     required this.bubbleColor,
@@ -47,6 +57,7 @@ class _GaugePainter extends CustomPainter {
 
   final double xAngle;
   final double yAngle;
+  final double fullScaleAngle;
   final Color vialColor;
   final Color lineColor;
   final Color bubbleColor;
@@ -78,10 +89,7 @@ class _GaugePainter extends CustomPainter {
         line,
       );
 
-    final raw = Offset(
-      xAngle / BubbleLevelGauge.fullScaleAngle,
-      -yAngle / BubbleLevelGauge.fullScaleAngle,
-    );
+    final raw = Offset(xAngle / fullScaleAngle, -yAngle / fullScaleAngle);
     final distance = math.min(raw.distance, 1);
     final direction = raw.distance == 0 ? Offset.zero : raw / raw.distance;
     final bubbleCenter = center + direction * (distance * travel);
@@ -97,6 +105,7 @@ class _GaugePainter extends CustomPainter {
   bool shouldRepaint(_GaugePainter oldDelegate) =>
       oldDelegate.xAngle != xAngle ||
       oldDelegate.yAngle != yAngle ||
+      oldDelegate.fullScaleAngle != fullScaleAngle ||
       oldDelegate.vialColor != vialColor ||
       oldDelegate.lineColor != lineColor ||
       oldDelegate.bubbleColor != bubbleColor;
