@@ -1,3 +1,12 @@
+## Running the app
+
+From `apps/marble_maze_app`, run the development flavor:
+
+```bash
+cd apps/marble_maze_app
+flutter run --flavor development --target lib/main_development.dart
+```
+
 ## Agent skills
 
 ### Issue tracker
