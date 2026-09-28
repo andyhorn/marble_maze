@@ -16,7 +16,7 @@ class BubbleLevelCubit extends Cubit<BubbleLevelState> {
 
   /// How much of each new reading is blended in, from 0 (frozen) to 1
   /// (unsmoothed).
-  static const double smoothing = 0.3;
+  static const double smoothing = 0.25;
 
   late final StreamSubscription<RawGravity> _subscription;
 

@@ -15,8 +15,8 @@ class BubbleLevelGauge extends StatelessWidget {
   final double yAngle;
 
   /// The tilt, in radians, at which the bubble reaches the vial's edge
-  /// (15 degrees).
-  static const double fullScaleAngle = 15 * math.pi / 180;
+  /// (25 degrees).
+  static const double fullScaleAngle = 25 * math.pi / 180;
 
   @override
   Widget build(BuildContext context) {
