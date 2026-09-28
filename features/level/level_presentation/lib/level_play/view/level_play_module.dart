@@ -185,7 +185,10 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             onSceneReady: _onSceneReady,
           ),
           overlay: _isSceneReady
-              ? LevelPlayReadyOverlay(onStart: () => _onStart(cubit))
+              ? LevelPlayReadyOverlay(
+                  onStart: () => _onStart(cubit),
+                  onBackToLevels: widget.onExitToLevels,
+                )
               : const LevelPlayLoadingView(),
         ),
         // Falling renders the same subtree as Playing (the board stays up
