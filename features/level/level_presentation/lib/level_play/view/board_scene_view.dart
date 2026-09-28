@@ -9,6 +9,7 @@ import 'package:flutter_scene/scene.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/animation/marble_exit_animation.dart';
 import 'package:level_presentation/level_play/animation/marble_sink_animation.dart';
+import 'package:level_presentation/level_play/board/board_scene.dart';
 import 'package:level_presentation/level_play/board/board_textures.dart';
 import 'package:level_presentation/level_play/board/wall_strip.dart';
 import 'package:level_presentation/level_play/board/wood_geometry.dart';
@@ -34,11 +35,6 @@ const _boardCamera = BoardCamera();
 
 /// Tuning for the wall-hit and hole-fall haptic taps.
 const _hapticsDecider = HapticsDecider();
-
-/// The bundled HDR environment map used for image-based lighting. See
-/// `assets/hdr/ASSETS.md` for its source and licence.
-const _environmentAsset =
-    'packages/level_presentation/assets/hdr/studio_small_03_1k.hdr';
 
 /// How the floor and walls sample the shared wood texture.
 const _woodSheet = WoodSheet();
@@ -66,52 +62,8 @@ const _boardLight = BoardLight();
 /// the whole scene is roughly one camera height away from the camera, so
 /// this comfortably covers it without wasting resolution the way
 /// flutter_scene's much larger default (`150`, spread over 4 cascades)
-/// would with only [_shadowCascadeCount].
+/// would with the board's single shadow cascade.
 const double _shadowMaxDistanceFactor = 1.3;
-
-/// The directional shadow's cascade count: `1`, since the light's direction
-/// changes every frame (see [_shadowCacheStaticShadows]) and the scene's
-/// small, fixed-height view has no need to spread resolution over several
-/// cascades at different distances.
-const int _shadowCascadeCount = 1;
-
-/// Whether the directional shadow caches `shadowStatic` nodes across
-/// frames: `false`, since the light's direction changes every frame as the
-/// board tilts, and rebuilding and replaying a cache would cost more than
-/// rendering casters directly.
-const bool _shadowCacheStaticShadows = false;
-
-/// The directional light's intensity, raised above flutter_scene's default
-/// (`3.0`) so lit surfaces read clearly brighter than [_environmentIntensity]
-/// dimmed shadow, keeping the directional light (and so its shadows) the
-/// dominant read rather than the ambient IBL term.
-const double _directionalLightIntensity = 4.5;
-
-/// The directional shadow map's resolution, raised above flutter_scene's
-/// default (`1024`) so a wall's shadow edge stays crisp at typical phone
-/// screen sizes instead of visibly blocky.
-const int _shadowMapResolution = 2048;
-
-/// The directional shadow's penumbra softness, lowered below flutter_scene's
-/// default (`0.08`) for a crisper, more legible shadow edge on a small
-/// screen.
-const double _shadowSoftness = 0.05;
-
-/// The image-based (HDR environment) lighting's intensity, dimmed well below
-/// its default (`1.0`) so it fills in ambient light without competing with,
-/// or washing out, the directional light's cast shadows.
-const double _environmentIntensity = 0.35;
-
-/// Screen-space ambient occlusion's strength: enabled, but at a modest
-/// fraction of its calibrated default (`1.0`), for a soft contact shadow in
-/// creases and corners on top of the directional light's own shadows.
-const double _ambientOcclusionIntensity = 0.6;
-
-/// How much of the screen-space occlusion also darkens the directional
-/// light, not just the (already dimmed) ambient IBL term: `0` by default,
-/// which would make ambient occlusion's contribution too faint to notice
-/// once [_environmentIntensity] is this low.
-const double _ambientOcclusionDirectLightAffect = 0.25;
 
 /// The highest pixel ratio the board renders at. Phones report a device
 /// pixel ratio of 3, which is about 2.25 times the pixels of 2 for detail
@@ -192,9 +144,10 @@ class BoardSceneView extends StatefulWidget {
 
 class _BoardSceneViewState extends State<BoardSceneView>
     with SingleTickerProviderStateMixin {
-  final Scene _scene = Scene();
   final Node _boardRoot = Node();
-  late final Node _marbleNode;
+  late final BoardScene _shared;
+  Scene get _scene => _shared.scene;
+  Node get _marbleNode => _shared.marbleNode;
   late final PerspectiveCamera _camera;
   Ticker? _ticker;
   StreamSubscription<SimulationEvent>? _eventsSubscription;
@@ -215,6 +168,7 @@ class _BoardSceneViewState extends State<BoardSceneView>
   vm.Vector2? _cameraFocus;
   double _viewportAspectRatio = 16 / 9;
   bool _ready = false;
+  bool _isOwner = false;
 
   // An alias so the fall-start timestamp below reads (and freezes while
   // paused) from the clock's active-only elapsed time, rather than
@@ -305,31 +259,8 @@ class _BoardSceneViewState extends State<BoardSceneView>
   }
 
   Future<void> _loadScene(TimelineTask task) async {
-    // Geometry and materials need the shader bundle, which is only
-    // available once the engine's static resources are loaded.
-    await _traceStage(
-      task,
-      'initializeStaticResources',
-      Scene.initializeStaticResources,
-    );
-
-    final textures = await _traceStage(
-      task,
-      'loadTextures',
-      BoardTextures.load,
-    );
-
-    Timeline.timeSync('buildBoard', () => _buildBoard(textures));
-    _marbleNode = Node(
-      mesh: Mesh(
-        SphereGeometry(radius: kMarbleRadius),
-        PhysicallyBasedMaterial()
-          ..baseColorTexture = textures.marble
-          ..metallicFactor = 0
-          ..roughnessFactor = 0.35,
-      ),
-    );
-    _boardRoot.add(_marbleNode);
+    _shared = await _traceStage(task, 'loadBoardScene', BoardScene.load);
+    Timeline.timeSync('buildBoard', () => _buildBoard(_shared.textures));
     _camera = PerspectiveCamera(
       fovRadiansY: _boardCamera.fovRadiansY,
       position: vm.Vector3(0, 8, 0),
@@ -338,41 +269,10 @@ class _BoardSceneViewState extends State<BoardSceneView>
       // down; this camera never looks anywhere else, so this never changes.
       up: vm.Vector3(0, 0, 1),
     );
-    _scene
-      ..add(_boardRoot)
-      ..directionalLight = DirectionalLight(
-        direction: _boardLight.directionFor(Tilt.flat),
-        intensity: _directionalLightIntensity,
-        castsShadow: true,
-        cacheStaticShadows: _shadowCacheStaticShadows,
-        shadowCascadeCount: _shadowCascadeCount,
-        shadowMapResolution: _shadowMapResolution,
-        shadowSoftness: _shadowSoftness,
-      )
-      // A patterned, non-metallic marble no longer needs a mirror highlight
-      // bloomed out; disabled so it doesn't wash out the swirl texture.
-      ..postProcess.bloom.enabled = false
-      // Modest screen-space contact shadowing in wall/floor creases, on top
-      // of the directional light's own cast shadows.
-      ..ambientOcclusion.enabled = true
-      ..ambientOcclusion.intensity = _ambientOcclusionIntensity
-      ..ambientOcclusion.directLightAffect = _ambientOcclusionDirectLightAffect;
-    await _traceStage(
-      task,
-      'loadEnvironment',
-      () => _scene.loadEnvironment(
-        _environmentAsset,
-        // The camera always looks straight down and cover-fits the board to
-        // the viewport, so the sky is never seen; disabling it is a cheap
-        // saving.
-        showSkybox: false,
-        // Dimmed well below the directional light's contribution, so cast
-        // shadows read clearly instead of being washed out by ambient IBL.
-        intensity: _environmentIntensity,
-      ),
-    );
 
     if (!mounted) return;
+    _shared.attach(_boardRoot, onEvicted: _onSceneEvicted);
+    _isOwner = true;
     setState(() => _ready = true);
     _ticker = createTicker(_onTick)..start();
     // After the frame that first builds the SceneView, so the loading view
@@ -504,7 +404,15 @@ class _BoardSceneViewState extends State<BoardSceneView>
     )..position = vm.Vector3(center.x, -_cupDepth / 2, center.z);
   }
 
+  /// Another board took over the shared scene, so this one stops driving it
+  /// and draws nothing.
+  void _onSceneEvicted() {
+    _isOwner = false;
+    if (mounted) setState(() {});
+  }
+
   void _onTick(Duration elapsed) {
+    if (!_isOwner) return;
     // Clamped so a stalled frame (for example while the app was
     // backgrounded, or while paused) does not dump a burst of physics or
     // animation on the next active frame; frozen while inactive so the
@@ -678,12 +586,13 @@ class _BoardSceneViewState extends State<BoardSceneView>
   void dispose() {
     unawaited(_eventsSubscription?.cancel());
     _ticker?.dispose();
+    if (_isOwner) _shared.detach(_boardRoot);
     super.dispose();
   }
 
   @override
   Widget build(BuildContext context) {
-    if (!_ready) return const SizedBox.expand();
+    if (!_ready || !_isOwner) return const SizedBox.expand();
     return LayoutBuilder(
       builder: (context, constraints) {
         if (constraints.maxHeight > 0) {

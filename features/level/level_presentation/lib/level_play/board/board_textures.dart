@@ -60,12 +60,6 @@ class BoardTextures {
     return pending;
   }
 
-  /// Starts [load] without waiting for it, so the textures are ready by the
-  /// time a level asks for them. A failure here is swallowed: the level
-  /// that needs the textures calls [load] itself and surfaces any error.
-  static void preload() =>
-      unawaited(load().then<void>((_) {}, onError: (_) {}));
-
   static Future<BoardTextures> _loadTextures() async {
     final woodColor = await Texture2D.fromAsset(_woodColorAsset);
     final woodNormal = await Texture2D.fromAsset(
