@@ -111,5 +111,17 @@
     "unsupportedDeviceMessage": "Laberinto de canicas necesita hardware gráfico que este dispositivo no tiene.",
     "@unsupportedDeviceMessage": {
         "description": "Mensaje que se muestra al iniciar cuando Flutter GPU no está disponible"
+    },
+    "bubbleLevelTooltip": "Nivel de burbuja",
+    "@bubbleLevelTooltip": {
+        "description": "Información sobre herramientas del botón de selección de nivel que abre el nivel de burbuja"
+    },
+    "bubbleLevelTitle": "Nivel de burbuja",
+    "@bubbleLevelTitle": {
+        "description": "Título de la pantalla del nivel de burbuja"
+    },
+    "bubbleLevelWaiting": "Esperando al acelerómetro…",
+    "@bubbleLevelWaiting": {
+        "description": "Se muestra en el nivel de burbuja hasta que llega la primera lectura del acelerómetro"
     }
 }

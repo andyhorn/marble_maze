@@ -87,4 +87,13 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get unsupportedDeviceMessage => 'Marble Maze needs graphics hardware this device doesn\'t have.';
+
+  @override
+  String get bubbleLevelTooltip => 'Bubble level';
+
+  @override
+  String get bubbleLevelTitle => 'Bubble level';
+
+  @override
+  String get bubbleLevelWaiting => 'Waiting for the accelerometer…';
 }

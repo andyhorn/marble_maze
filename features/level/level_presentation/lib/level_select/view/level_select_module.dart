@@ -12,11 +12,19 @@ import 'package:progress_domain/progress_domain.dart';
 class LevelSelectModule extends StatelessWidget {
   /// Creates a level select module.
   ///
-  /// [onLevelSelected] is called with a level's id when its row is tapped.
-  const new({required this.onLevelSelected, super.key});
+  /// [onLevelSelected] is called with a level's id when its row is tapped,
+  /// and [onOpenBubbleLevel] when the bubble level button is tapped.
+  const new({
+    required this.onLevelSelected,
+    required this.onOpenBubbleLevel,
+    super.key,
+  });
 
   /// Called when the player taps a level's row.
   final ValueChanged<String> onLevelSelected;
+
+  /// Called when the player taps the bubble level button.
+  final VoidCallback onOpenBubbleLevel;
 
   @override
   Widget build(BuildContext context) {
@@ -29,7 +37,10 @@ class LevelSelectModule extends StatelessWidget {
         unawaited(cubit.load());
         return cubit;
       },
-      child: LevelSelectView(onLevelSelected: onLevelSelected),
+      child: LevelSelectView(
+        onLevelSelected: onLevelSelected,
+        onOpenBubbleLevel: onOpenBubbleLevel,
+      ),
     );
   }
 }

@@ -87,4 +87,13 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get unsupportedDeviceMessage => 'Laberinto de canicas necesita hardware gráfico que este dispositivo no tiene.';
+
+  @override
+  String get bubbleLevelTooltip => 'Nivel de burbuja';
+
+  @override
+  String get bubbleLevelTitle => 'Nivel de burbuja';
+
+  @override
+  String get bubbleLevelWaiting => 'Esperando al acelerómetro…';
 }

@@ -41,7 +41,10 @@ void main() {
               value: levelsRepository,
               child: RepositoryProvider<IProgressRepository>.value(
                 value: progressRepository,
-                child: LevelSelectModule(onLevelSelected: (id) {}),
+                child: LevelSelectModule(
+                  onLevelSelected: (id) {},
+                  onOpenBubbleLevel: () {},
+                ),
               ),
             ),
           ),

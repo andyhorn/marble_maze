@@ -234,6 +234,24 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Marble Maze needs graphics hardware this device doesn\'t have.'**
   String get unsupportedDeviceMessage;
+
+  /// Tooltip of the level select button that opens the bubble level
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble level'**
+  String get bubbleLevelTooltip;
+
+  /// Title of the bubble level screen
+  ///
+  /// In en, this message translates to:
+  /// **'Bubble level'**
+  String get bubbleLevelTitle;
+
+  /// Shown on the bubble level screen until the first accelerometer reading arrives
+  ///
+  /// In en, this message translates to:
+  /// **'Waiting for the accelerometer…'**
+  String get bubbleLevelWaiting;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

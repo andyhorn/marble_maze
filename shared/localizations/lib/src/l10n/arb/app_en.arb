@@ -111,5 +111,17 @@
     "unsupportedDeviceMessage": "Marble Maze needs graphics hardware this device doesn't have.",
     "@unsupportedDeviceMessage": {
         "description": "Message shown at startup when Flutter GPU is unavailable"
+    },
+    "bubbleLevelTooltip": "Bubble level",
+    "@bubbleLevelTooltip": {
+        "description": "Tooltip of the level select button that opens the bubble level"
+    },
+    "bubbleLevelTitle": "Bubble level",
+    "@bubbleLevelTitle": {
+        "description": "Title of the bubble level screen"
+    },
+    "bubbleLevelWaiting": "Waiting for the accelerometer…",
+    "@bubbleLevelWaiting": {
+        "description": "Shown on the bubble level screen until the first accelerometer reading arrives"
     }
 }

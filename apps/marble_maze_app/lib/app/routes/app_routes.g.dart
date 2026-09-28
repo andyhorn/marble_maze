@@ -6,7 +6,11 @@ part of 'app_routes.dart';
 // GoRouterGenerator
 // **************************************************************************
 
-List<RouteBase> get $appRoutes => [$levelSelectRoute, $levelPlayRoute];
+List<RouteBase> get $appRoutes => [
+  $levelSelectRoute,
+  $bubbleLevelRoute,
+  $levelPlayRoute,
+];
 
 RouteBase get $levelSelectRoute => GoRouteData.$route(
   path: '/',
@@ -20,6 +24,33 @@ mixin $LevelSelectRoute on GoRouteData {
 
   @override
   String get location => GoRouteData.$location('/');
+
+  @override
+  void go(BuildContext context) => context.go(location);
+
+  @override
+  Future<T?> push<T>(BuildContext context) => context.push<T>(location);
+
+  @override
+  void pushReplacement(BuildContext context) =>
+      context.pushReplacement(location);
+
+  @override
+  void replace(BuildContext context) => context.replace(location);
+}
+
+RouteBase get $bubbleLevelRoute => GoRouteData.$route(
+  path: '/bubble-level',
+  hasOverriddenOnExit: false,
+  factory: $BubbleLevelRoute._fromState,
+);
+
+mixin $BubbleLevelRoute on GoRouteData {
+  static BubbleLevelRoute _fromState(GoRouterState state) =>
+      const BubbleLevelRoute();
+
+  @override
+  String get location => GoRouteData.$location('/bubble-level');
 
   @override
   void go(BuildContext context) => context.go(location);

@@ -24,12 +24,18 @@ void main() {
       progressRepository = _MockProgressRepository();
     });
 
-    Widget buildSubject({ValueChanged<String>? onLevelSelected}) {
+    Widget buildSubject({
+      ValueChanged<String>? onLevelSelected,
+      VoidCallback? onOpenBubbleLevel,
+    }) {
       return RepositoryProvider<ILevelsRepository>.value(
         value: levelsRepository,
         child: RepositoryProvider<IProgressRepository>.value(
           value: progressRepository,
-          child: LevelSelectModule(onLevelSelected: onLevelSelected ?? (_) {}),
+          child: LevelSelectModule(
+            onLevelSelected: onLevelSelected ?? (_) {},
+            onOpenBubbleLevel: onOpenBubbleLevel ?? () {},
+          ),
         ),
       );
     }
@@ -78,6 +84,25 @@ void main() {
       await tester.tap(find.text('First Roll'));
 
       expect(selected, 'first_roll');
+    });
+
+    testWidgets('calls onOpenBubbleLevel when the bubble level button is '
+        'tapped', (tester) async {
+      var opened = false;
+      when(() => levelsRepository.getManifest()).thenAnswer(
+        (_) async => const [
+          LevelManifestEntry(id: 'first_roll', title: 'First Roll'),
+        ],
+      );
+      when(() => progressRepository.getRecords()).thenAnswer((_) async => {});
+
+      await tester.pumpApp(
+        buildSubject(onOpenBubbleLevel: () => opened = true),
+      );
+      await tester.pumpAndSettle();
+      await tester.tap(find.byTooltip('Bubble level'));
+
+      expect(opened, isTrue);
     });
   });
 }

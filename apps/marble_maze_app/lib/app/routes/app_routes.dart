@@ -15,7 +15,19 @@ class LevelSelectRoute extends GoRouteData with $LevelSelectRoute {
   @override
   Widget build(BuildContext context, GoRouterState state) => LevelSelectModule(
     onLevelSelected: (id) => LevelPlayRoute(id: id).push<void>(context),
+    onOpenBubbleLevel: () => const BubbleLevelRoute().push<void>(context),
   );
+}
+
+/// The bubble level route: a spirit level driven by the accelerometer.
+@TypedGoRoute<BubbleLevelRoute>(path: '/bubble-level')
+class BubbleLevelRoute extends GoRouteData with $BubbleLevelRoute {
+  /// Creates the bubble level route.
+  const new();
+
+  @override
+  Widget build(BuildContext context, GoRouterState state) =>
+      const BubbleLevelModule();
 }
 
 /// The level play route: loads and plays the level with [id].
