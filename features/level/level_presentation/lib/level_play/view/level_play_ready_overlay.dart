@@ -23,18 +23,19 @@ class LevelPlayReadyOverlay extends StatelessWidget {
       behavior: HitTestBehavior.opaque,
       onTap: onStart,
       child: Center(
-        child: OverlayPanel(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(l10n.levelPlayTapToStart),
-              const SizedBox(height: 16),
-              SecondaryButton(
-                onPressed: onBackToLevels,
-                child: Text(l10n.backToLevels),
-              ),
-            ],
-          ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PrimaryButton(
+              onPressed: onStart,
+              child: Text(l10n.levelPlayTapToStart),
+            ),
+            const SizedBox(height: 8),
+            SecondaryButton(
+              onPressed: onBackToLevels,
+              child: Text(l10n.backToLevels),
+            ),
+          ],
         ),
       ),
     );
