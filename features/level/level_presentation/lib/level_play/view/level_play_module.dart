@@ -29,6 +29,7 @@ typedef BoardBuilder = Widget Function({
   required VoidCallback onMarbleFell,
   required VoidCallback onMarbleRespawned,
   required VoidCallback onReachedExit,
+  required VoidCallback onSceneReady,
 });
 
 /// The level play screen's module: wires a level play cubit to the
@@ -109,6 +110,7 @@ class _LevelPlayModuleBody extends StatefulWidget {
 
 class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   IMarbleSimulation? _simulation;
+  bool _isSceneReady = false;
   late final LevelPlayInputController _controller;
   late final AppLifecycleListener _lifecycleListener;
 
@@ -149,6 +151,11 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
     super.dispose();
   }
 
+  void _onSceneReady() {
+    if (!mounted || _isSceneReady) return;
+    setState(() => _isSceneReady = true);
+  }
+
   void _onStart(LevelPlayCubit cubit) {
     _controller.calibrate();
     cubit.start();
@@ -175,8 +182,11 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,
+            onSceneReady: _onSceneReady,
           ),
-          overlay: LevelPlayReadyOverlay(onStart: () => _onStart(cubit)),
+          overlay: _isSceneReady
+              ? LevelPlayReadyOverlay(onStart: () => _onStart(cubit))
+              : const LevelPlayLoadingView(),
         ),
         // Falling renders the same subtree as Playing (the board stays up
         // while the marble sinks), so both branches build a BoardSceneView
@@ -192,6 +202,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,
+            onSceneReady: _onSceneReady,
           ),
           overlay: LevelPlayPlayingOverlay(
             cubit: cubit,
@@ -212,6 +223,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             onMarbleFell: cubit.marbleFell,
             onMarbleRespawned: cubit.marbleRespawned,
             onReachedExit: cubit.marbleReachedExit,
+            onSceneReady: _onSceneReady,
           ),
           overlay: LevelPlayPausedOverlay(
             onResume: cubit.resume,
@@ -235,6 +247,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
               onMarbleFell: cubit.marbleFell,
               onMarbleRespawned: cubit.marbleRespawned,
               onReachedExit: cubit.marbleReachedExit,
+              onSceneReady: _onSceneReady,
             ),
             overlay: LevelPlayWonOverlay(
               time: time,

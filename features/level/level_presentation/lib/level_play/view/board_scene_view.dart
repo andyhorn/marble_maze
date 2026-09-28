@@ -158,6 +158,7 @@ class BoardSceneView extends StatefulWidget {
     required this.onMarbleFell,
     required this.onMarbleRespawned,
     required this.onReachedExit,
+    required this.onSceneReady,
     super.key,
   });
 
@@ -186,6 +187,11 @@ class BoardSceneView extends StatefulWidget {
 
   /// Called when the marble reaches the level's exit.
   final VoidCallback onReachedExit;
+
+  /// Called once, when every texture, shader and the lighting environment
+  /// have loaded and the board is first drawn. Until then the view renders
+  /// nothing.
+  final VoidCallback onSceneReady;
 
   @override
   State<BoardSceneView> createState() => _BoardSceneViewState();
@@ -337,22 +343,25 @@ class _BoardSceneViewState extends State<BoardSceneView>
       ..ambientOcclusion.enabled = true
       ..ambientOcclusion.intensity = _ambientOcclusionIntensity
       ..ambientOcclusion.directLightAffect = _ambientOcclusionDirectLightAffect;
-    unawaited(
-      _scene.loadEnvironment(
-        _environmentAsset,
-        // The camera always looks straight down and cover-fits the board to
-        // the viewport, so the sky is never seen; disabling it is a cheap
-        // saving.
-        showSkybox: false,
-        // Dimmed well below the directional light's contribution, so cast
-        // shadows read clearly instead of being washed out by ambient IBL.
-        intensity: _environmentIntensity,
-      ),
+    await _scene.loadEnvironment(
+      _environmentAsset,
+      // The camera always looks straight down and cover-fits the board to
+      // the viewport, so the sky is never seen; disabling it is a cheap
+      // saving.
+      showSkybox: false,
+      // Dimmed well below the directional light's contribution, so cast
+      // shadows read clearly instead of being washed out by ambient IBL.
+      intensity: _environmentIntensity,
     );
 
     if (!mounted) return;
     setState(() => _ready = true);
     _ticker = createTicker(_onTick)..start();
+    // After the frame that first builds the SceneView, so the loading view
+    // is not lifted before the board has had a chance to draw.
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) widget.onSceneReady();
+    });
   }
 
   static const Color _cupColor = Color(0xFF141414);

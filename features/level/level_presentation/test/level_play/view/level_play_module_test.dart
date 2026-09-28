@@ -62,7 +62,11 @@ Widget _placeholderBoardBuilder({
   required VoidCallback onMarbleFell,
   required VoidCallback onMarbleRespawned,
   required VoidCallback onReachedExit,
-}) => const Placeholder();
+  required VoidCallback onSceneReady,
+}) {
+  WidgetsBinding.instance.addPostFrameCallback((_) => onSceneReady());
+  return const Placeholder();
+}
 
 const _level = Level(
   id: 'first_roll',
@@ -130,6 +134,45 @@ void main() {
       await tester.pumpApp(buildSubject());
 
       expect(find.byType(LevelPlayLoadingView), findsOneWidget);
+    });
+
+    testWidgets('shows the loading view until the board scene is ready', (
+      tester,
+    ) async {
+      when(() => repository.getLevel('first_roll'))
+          .thenAnswer((_) async => _level);
+      late VoidCallback sceneReady;
+
+      await tester.pumpApp(
+        buildSubject(
+          boardBuilder:
+              ({
+                required level,
+                required simulation,
+                required isSimulationActive,
+                required controller,
+                required onMarbleFell,
+                required onMarbleRespawned,
+                required onReachedExit,
+                required onSceneReady,
+              }) {
+                sceneReady = onSceneReady;
+                return const Placeholder();
+              },
+        ),
+      );
+      // pump, not pumpAndSettle: the spinner animates forever.
+      await tester.pump();
+      await tester.pump();
+
+      expect(find.byType(LevelPlayLoadingView), findsOneWidget);
+      expect(find.byType(LevelPlayReadyOverlay), findsNothing);
+
+      sceneReady();
+      await tester.pumpAndSettle();
+
+      expect(find.byType(LevelPlayLoadingView), findsNothing);
+      expect(find.byType(LevelPlayReadyOverlay), findsOneWidget);
     });
 
     testWidgets('shows the ready overlay once the level loads', (tester) async {
@@ -226,7 +269,9 @@ void main() {
             required VoidCallback onMarbleFell,
             required VoidCallback onMarbleRespawned,
             required VoidCallback onReachedExit,
+            required VoidCallback onSceneReady,
           }) {
+            WidgetsBinding.instance.addPostFrameCallback((_) => onSceneReady());
             capturedIsActive = isSimulationActive;
             return const Placeholder();
           }
