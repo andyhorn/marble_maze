@@ -15,6 +15,9 @@ void main() {
       when(
         () => settingsRepository.setCalibrateTilt(value: any(named: 'value')),
       ).thenAnswer((_) async {});
+      when(
+        () => settingsRepository.setShowBubbleLevel(value: any(named: 'value')),
+      ).thenAnswer((_) async {});
     });
 
     SettingsCubit buildCubit() =>
@@ -26,12 +29,17 @@ void main() {
 
     blocTest<SettingsCubit, SettingsState>(
       'load emits the saved setting',
-      setUp: () =>
-          when(() => settingsRepository.getCalibrateTilt())
-              .thenAnswer((_) async => false),
+      setUp: () {
+        when(() => settingsRepository.getCalibrateTilt())
+            .thenAnswer((_) async => false);
+        when(() => settingsRepository.getShowBubbleLevel())
+            .thenAnswer((_) async => false);
+      },
       build: buildCubit,
       act: (cubit) => cubit.load(),
-      expect: () => [const SettingsState(calibrateTilt: false)],
+      expect: () => [
+        const SettingsState(calibrateTilt: false, showBubbleLevel: false),
+      ],
     );
 
     blocTest<SettingsCubit, SettingsState>(
@@ -41,6 +49,19 @@ void main() {
       expect: () => [const SettingsState(calibrateTilt: false)],
       verify: (_) =>
           verify(() => settingsRepository.setCalibrateTilt(value: false))
+              .called(1),
+    );
+
+    blocTest<SettingsCubit, SettingsState>(
+      'setShowBubbleLevel emits and saves the new value, keeping the rest',
+      build: buildCubit,
+      seed: () => const SettingsState(calibrateTilt: false),
+      act: (cubit) => cubit.setShowBubbleLevel(value: false),
+      expect: () => [
+        const SettingsState(calibrateTilt: false, showBubbleLevel: false),
+      ],
+      verify: (_) =>
+          verify(() => settingsRepository.setShowBubbleLevel(value: false))
               .called(1),
     );
   });

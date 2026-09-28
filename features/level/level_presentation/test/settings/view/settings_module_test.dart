@@ -18,6 +18,11 @@ void main() {
       when(
         () => settingsRepository.setCalibrateTilt(value: any(named: 'value')),
       ).thenAnswer((_) async {});
+      when(
+        () => settingsRepository.setShowBubbleLevel(value: any(named: 'value')),
+      ).thenAnswer((_) async {});
+      when(() => settingsRepository.getShowBubbleLevel())
+          .thenAnswer((_) async => true);
     });
 
     Widget buildSubject({VoidCallback? onOpenBubbleLevel}) =>
@@ -33,7 +38,12 @@ void main() {
       await tester.pumpApp(buildSubject());
       await tester.pumpAndSettle();
 
-      final tile = tester.widget<SwitchListTile>(find.byType(SwitchListTile));
+      final tile = tester.widget<SwitchListTile>(
+        find.widgetWithText(
+          SwitchListTile,
+          'Calibrate to how I hold the device',
+        ),
+      );
       expect(tile.value, isFalse);
     });
 
@@ -43,7 +53,7 @@ void main() {
 
       await tester.pumpApp(buildSubject());
       await tester.pumpAndSettle();
-      await tester.tap(find.byType(SwitchListTile));
+      await tester.tap(find.text('Calibrate to how I hold the device'));
       await tester.pumpAndSettle();
 
       verify(() => settingsRepository.setCalibrateTilt(value: false)).called(1);
@@ -63,6 +73,21 @@ void main() {
       await tester.tap(find.text('Bubble level'));
 
       expect(opened, isTrue);
+    });
+
+    testWidgets('saves the setting when the bubble level switch is toggled', (
+      tester,
+    ) async {
+      when(() => settingsRepository.getCalibrateTilt())
+          .thenAnswer((_) async => true);
+
+      await tester.pumpApp(buildSubject());
+      await tester.pumpAndSettle();
+      await tester.tap(find.text('Show the bubble level while playing'));
+      await tester.pumpAndSettle();
+
+      verify(() => settingsRepository.setShowBubbleLevel(value: false))
+          .called(1);
     });
   });
 }

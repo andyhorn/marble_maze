@@ -179,5 +179,26 @@ void main() {
       expect(gauge.fullScaleAngle, Tilt.maxTilt);
       controller.dispose();
     });
+
+    testWidgets('hides the bubble level when showBubbleLevel is false', (
+      tester,
+    ) async {
+      final repository = _FakeTiltRepository()..isAvailableResult = false;
+      controller = LevelPlayInputController(repository: repository);
+      await controller.initialize();
+
+      await tester.pumpApp(
+        LevelPlayPlayingOverlay(
+          cubit: cubit,
+          title: 'First Roll',
+          controller: controller,
+          onPause: () {},
+          showBubbleLevel: false,
+        ),
+      );
+
+      expect(find.byType(BubbleLevelGauge), findsNothing);
+      controller.dispose();
+    });
   });
 }

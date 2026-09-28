@@ -29,11 +29,19 @@ class _FakeTiltRepository implements ITiltRepository {
 }
 
 class _FakeSettingsRepository implements ISettingsRepository {
+  bool showBubbleLevel = true;
+
   @override
   Future<bool> getCalibrateTilt() async => true;
 
   @override
   Future<void> setCalibrateTilt({required bool value}) async {}
+
+  @override
+  Future<bool> getShowBubbleLevel() async => showBubbleLevel;
+
+  @override
+  Future<void> setShowBubbleLevel({required bool value}) async {}
 }
 
 class _FakeMarbleSimulation implements IMarbleSimulation {
@@ -113,6 +121,7 @@ void main() {
 
     Widget buildSubject({
       BoardBuilder boardBuilder = _placeholderBoardBuilder,
+      bool showBubbleLevel = true,
     }) {
       return MultiRepositoryProvider(
         providers: [
@@ -124,7 +133,7 @@ void main() {
             value: _FakeTiltRepository(),
           ),
           RepositoryProvider<ISettingsRepository>.value(
-            value: _FakeSettingsRepository(),
+            value: _FakeSettingsRepository()..showBubbleLevel = showBubbleLevel,
           ),
         ],
         child: LevelPlayModule(
@@ -206,6 +215,43 @@ void main() {
       await tester.pumpAndSettle();
 
       expect(find.byType(LevelPlayErrorView), findsOneWidget);
+    });
+
+    group('while playing', () {
+      setUp(() {
+        when(() => repository.getLevel('first_roll'))
+            .thenAnswer((_) async => _level);
+      });
+
+      Future<void> startPlaying(
+        WidgetTester tester, {
+        required bool showBubbleLevel,
+      }) async {
+        await tester.pumpApp(buildSubject(showBubbleLevel: showBubbleLevel));
+        await tester.pumpAndSettle();
+        tester
+            .element(find.byType(LevelPlayReadyOverlay))
+            .read<LevelPlayCubit>()
+            .start();
+        // Not pumpAndSettle: the HUD and bubble level tickers never settle.
+        await tester.pump();
+        await tester.pump();
+      }
+
+      testWidgets('shows the bubble level by default', (tester) async {
+        await startPlaying(tester, showBubbleLevel: true);
+
+        expect(find.byType(BubbleLevelGauge), findsOneWidget);
+      });
+
+      testWidgets('hides the bubble level when the setting is off', (
+        tester,
+      ) async {
+        await startPlaying(tester, showBubbleLevel: false);
+
+        expect(find.byType(LevelPlayPlayingOverlay), findsOneWidget);
+        expect(find.byType(BubbleLevelGauge), findsNothing);
+      });
     });
 
     group('once the marble reaches the exit', () {

@@ -11,4 +11,12 @@ abstract interface class ISettingsRepository {
 
   /// Saves whether tilt input calibrates to the held angle.
   Future<void> setCalibrateTilt({required bool value});
+
+  /// Whether the bubble level is shown in the corner while playing.
+  ///
+  /// Defaults to true, including when nothing is saved or reading fails.
+  Future<bool> getShowBubbleLevel();
+
+  /// Saves whether the bubble level is shown while playing.
+  Future<void> setShowBubbleLevel({required bool value});
 }

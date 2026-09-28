@@ -108,4 +108,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get bubbleLevelWaiting => 'Waiting for the accelerometer…';
+
+  @override
+  String get settingsShowBubbleLevelTitle => 'Show the bubble level while playing';
+
+  @override
+  String get settingsShowBubbleLevelSubtitle => 'A small level in the corner showing how the board is tilted.';
 }

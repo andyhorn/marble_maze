@@ -139,5 +139,13 @@
     "bubbleLevelWaiting": "Waiting for the accelerometer…",
     "@bubbleLevelWaiting": {
         "description": "Shown on the bubble level screen until the first accelerometer reading arrives"
+    },
+    "settingsShowBubbleLevelTitle": "Show the bubble level while playing",
+    "@settingsShowBubbleLevelTitle": {
+        "description": "Title of the setting that shows or hides the in-level bubble level"
+    },
+    "settingsShowBubbleLevelSubtitle": "A small level in the corner showing how the board is tilted.",
+    "@settingsShowBubbleLevelSubtitle": {
+        "description": "Explains the setting that shows or hides the in-level bubble level"
     }
 }

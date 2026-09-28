@@ -29,6 +29,14 @@ class SettingsView extends StatelessWidget {
               onChanged: (value) =>
                   context.read<SettingsCubit>().setCalibrateTilt(value: value),
             ),
+            SwitchListTile(
+              title: Text(l10n.settingsShowBubbleLevelTitle),
+              subtitle: Text(l10n.settingsShowBubbleLevelSubtitle),
+              value: state.showBubbleLevel,
+              onChanged: (value) => context
+                  .read<SettingsCubit>()
+                  .setShowBubbleLevel(value: value),
+            ),
             ListTile(
               leading: const Icon(Icons.straighten),
               title: Text(l10n.settingsBubbleLevel),

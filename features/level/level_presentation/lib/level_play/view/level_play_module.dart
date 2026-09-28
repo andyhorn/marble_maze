@@ -113,6 +113,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
   IMarbleSimulation? _simulation;
   bool _isSceneReady = false;
   bool _calibrateTilt = true;
+  bool _showBubbleLevel = true;
   late final LevelPlayInputController _controller;
   late final AppLifecycleListener _lifecycleListener;
 
@@ -126,7 +127,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
       repository: context.read<ITiltRepository>(),
     );
     unawaited(_controller.initialize());
-    unawaited(_loadCalibrateTilt());
+    unawaited(_loadSettings());
     // Only pauses: the player must tap Resume, so returning to the
     // foreground never restarts the timer or physics on its own.
     _lifecycleListener = AppLifecycleListener(
@@ -134,11 +135,15 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
     );
   }
 
-  Future<void> _loadCalibrateTilt() async {
-    final calibrateTilt = await context
-        .read<ISettingsRepository>()
-        .getCalibrateTilt();
-    if (mounted) _calibrateTilt = calibrateTilt;
+  Future<void> _loadSettings() async {
+    final settings = context.read<ISettingsRepository>();
+    final calibrateTilt = await settings.getCalibrateTilt();
+    final showBubbleLevel = await settings.getShowBubbleLevel();
+    if (!mounted) return;
+    _calibrateTilt = calibrateTilt;
+    if (showBubbleLevel != _showBubbleLevel) {
+      setState(() => _showBubbleLevel = showBubbleLevel);
+    }
   }
 
   void _onAppLifecycleStateChanged(AppLifecycleState state) {
@@ -222,6 +227,7 @@ class _LevelPlayModuleBodyState extends State<_LevelPlayModuleBody> {
             title: level.title,
             controller: _controller,
             onPause: cubit.pause,
+            showBubbleLevel: _showBubbleLevel,
           ),
         ),
         // Also builds a BoardSceneView, the same as Playing and Falling

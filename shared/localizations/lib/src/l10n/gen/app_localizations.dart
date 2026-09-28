@@ -276,6 +276,18 @@ abstract class AppLocalizations {
   /// In en, this message translates to:
   /// **'Waiting for the accelerometer…'**
   String get bubbleLevelWaiting;
+
+  /// Title of the setting that shows or hides the in-level bubble level
+  ///
+  /// In en, this message translates to:
+  /// **'Show the bubble level while playing'**
+  String get settingsShowBubbleLevelTitle;
+
+  /// Explains the setting that shows or hides the in-level bubble level
+  ///
+  /// In en, this message translates to:
+  /// **'A small level in the corner showing how the board is tilted.'**
+  String get settingsShowBubbleLevelSubtitle;
 }
 
 class _AppLocalizationsDelegate extends LocalizationsDelegate<AppLocalizations> {

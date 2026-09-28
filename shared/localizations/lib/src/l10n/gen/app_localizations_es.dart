@@ -108,4 +108,10 @@ class AppLocalizationsEs extends AppLocalizations {
 
   @override
   String get bubbleLevelWaiting => 'Esperando al acelerómetro…';
+
+  @override
+  String get settingsShowBubbleLevelTitle => 'Mostrar el nivel de burbuja al jugar';
+
+  @override
+  String get settingsShowBubbleLevelSubtitle => 'Un pequeño nivel en la esquina que muestra la inclinación del tablero.';
 }

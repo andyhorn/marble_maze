@@ -33,6 +33,12 @@ class _FakeSettingsRepository implements ISettingsRepository {
 
   @override
   Future<void> setCalibrateTilt({required bool value}) async {}
+
+  @override
+  Future<bool> getShowBubbleLevel() async => true;
+
+  @override
+  Future<void> setShowBubbleLevel({required bool value}) async {}
 }
 
 void main() {

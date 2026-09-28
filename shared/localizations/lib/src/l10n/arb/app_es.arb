@@ -139,5 +139,13 @@
     "bubbleLevelWaiting": "Esperando al acelerómetro…",
     "@bubbleLevelWaiting": {
         "description": "Se muestra en el nivel de burbuja hasta que llega la primera lectura del acelerómetro"
+    },
+    "settingsShowBubbleLevelTitle": "Mostrar el nivel de burbuja al jugar",
+    "@settingsShowBubbleLevelTitle": {
+        "description": "Título del ajuste que muestra u oculta el nivel de burbuja durante el juego"
+    },
+    "settingsShowBubbleLevelSubtitle": "Un pequeño nivel en la esquina que muestra la inclinación del tablero.",
+    "@settingsShowBubbleLevelSubtitle": {
+        "description": "Explica el ajuste que muestra u oculta el nivel de burbuja durante el juego"
     }
 }
