@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'dart:developer' show Timeline, TimelineTask;
+import 'dart:math' as math;
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
@@ -111,6 +112,12 @@ const double _ambientOcclusionIntensity = 0.6;
 /// which would make ambient occlusion's contribution too faint to notice
 /// once [_environmentIntensity] is this low.
 const double _ambientOcclusionDirectLightAffect = 0.25;
+
+/// The highest pixel ratio the board renders at. Phones report a device
+/// pixel ratio of 3, which is about 2.25 times the pixels of 2 for detail
+/// this scene doesn't need; on-device, rendering at 3 sank from about 100
+/// to 45 fps as the phone warmed up, while 2 held 120 fps throughout.
+const double _maxRenderPixelRatio = 2;
 
 /// A harmless fallback background colour, never actually seen: the camera
 /// always cover-fits the board to the viewport, so this never shows through.
@@ -704,7 +711,14 @@ class _BoardSceneViewState extends State<BoardSceneView>
           // `SceneView` fills this box completely every frame.
           child: ColoredBox(
             color: _boardBackgroundColor,
-            child: SceneView(_scene, camera: _camera),
+            child: SceneView(
+              _scene,
+              camera: _camera,
+              pixelRatio: math.min(
+                View.of(context).devicePixelRatio,
+                _maxRenderPixelRatio,
+              ),
+            ),
           ),
         );
       },
