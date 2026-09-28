@@ -1,14 +1,27 @@
 # Bundled assets
 
-## fine_grained_wood_col_1k.jpg
+## oak_veneer_01_*.jpg
 
-- Source: [Poly Haven — Fine Grained Wood](https://polyhaven.com/a/fine_grained_wood)
-- Direct download: https://dl.polyhaven.org/file/ph-assets/Textures/jpg/1k/fine_grained_wood/fine_grained_wood_col_1k.jpg
-- Resolution: 1k
+- Source: [Poly Haven — Oak Veneer 01](https://polyhaven.com/a/oak_veneer_01)
+- Downloads (2k JPG): `https://dl.polyhaven.org/file/ph-assets/Textures/jpg/2k/oak_veneer_01/oak_veneer_01_{diff,nor_gl,rough}_2k.jpg`
 - Licence: [CC0](https://polyhaven.com/license) (public domain, no attribution required)
 
-Used as the base-colour texture for the board's floor and walls
-(`BoardSceneView`).
+Used for the board's floor and walls (`BoardSceneView`):
+
+- `oak_veneer_01_diff_2k.jpg`: base colour, re-encoded at JPEG quality 85.
+- `oak_veneer_01_nor_gl_2k.jpg`: OpenGL-convention normal map, re-encoded
+  at quality 90.
+- `oak_veneer_01_rough_1k.jpg`: roughness, converted to greyscale and
+  downsized to 1k (quality 85). The material reads it through glTF's
+  metallic-roughness slot, which takes roughness from the green channel.
+
+Re-encode with ImageMagick:
+
+```
+magick oak_veneer_01_diff_2k.jpg -strip -quality 85 oak_veneer_01_diff_2k.jpg
+magick oak_veneer_01_nor_gl_2k.jpg -strip -quality 90 oak_veneer_01_nor_gl_2k.jpg
+magick oak_veneer_01_rough_2k.jpg -strip -colorspace Gray -resize 1024x1024 -quality 85 oak_veneer_01_rough_1k.jpg
+```
 
 ## marble_swirl.png
 

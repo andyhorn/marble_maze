@@ -1,6 +1,4 @@
 import 'dart:async';
-import 'dart:math' as math;
-import 'dart:typed_data';
 
 import 'package:flutter/gestures.dart' show DragStartBehavior;
 import 'package:flutter/scheduler.dart';
@@ -9,6 +7,8 @@ import 'package:flutter_scene/scene.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/animation/marble_exit_animation.dart';
 import 'package:level_presentation/level_play/animation/marble_sink_animation.dart';
+import 'package:level_presentation/level_play/board/wall_strip.dart';
+import 'package:level_presentation/level_play/board/wood_geometry.dart';
 import 'package:level_presentation/level_play/camera/board_camera.dart';
 import 'package:level_presentation/level_play/haptics/haptics_decider.dart';
 import 'package:level_presentation/level_play/input/level_play_input_controller.dart';
@@ -37,22 +37,33 @@ const _hapticsDecider = HapticsDecider();
 const _environmentAsset =
     'packages/level_presentation/assets/hdr/studio_small_03_1k.hdr';
 
-/// The wood base-colour texture used for the floor and walls. See
-/// `assets/textures/ASSETS.md` for its source and licence.
-const _woodTextureAsset =
-    'packages/level_presentation/assets/textures/'
-    'fine_grained_wood_col_1k.jpg';
+/// The oak textures used for the floor and walls: base colour, OpenGL
+/// convention normal map, and a greyscale roughness map (read from its green
+/// channel, as glTF's metallic-roughness slot expects). See
+/// `assets/textures/ASSETS.md` for their source and licence.
+const _woodColorAsset =
+    'packages/level_presentation/assets/textures/oak_veneer_01_diff_2k.jpg';
+const _woodNormalAsset =
+    'packages/level_presentation/assets/textures/oak_veneer_01_nor_gl_2k.jpg';
+const _woodRoughnessAsset =
+    'packages/level_presentation/assets/textures/oak_veneer_01_rough_1k.jpg';
 
 /// The generated marble base-colour swirl texture. See
 /// `assets/textures/ASSETS.md` for how it's built.
 const _marbleTextureAsset =
     'packages/level_presentation/assets/textures/marble_swirl.png';
 
-/// How many world units of wood texture map to one UV tile. Chosen so the
-/// grain doesn't stretch across the whole board, and, being a non-integer
-/// fraction of a 1-unit cell, doesn't visibly repeat in lockstep with cell
-/// boundaries either.
-const double _woodUvUnitsPerTile = 1.6;
+/// How the floor and walls sample the shared wood texture.
+const _woodSheet = WoodSheet();
+
+/// Multiplies the roughness map (averaging about `0.53`, raw veneer) down to
+/// a satin-varnished average of about `0.45`, so the finish shows a soft
+/// sheen that moves with the light.
+const double _woodRoughnessFactor = 0.85;
+
+/// How strongly the normal map bends the surface: enough for the grain's
+/// pores to catch the tilting light without the board looking embossed.
+const double _woodNormalScale = 1;
 
 /// How deep, in world units, a hole's or the exit's cup is recessed below
 /// the floor. `MarbleSinkAnimation` and `MarbleExitAnimation`'s default
@@ -117,9 +128,8 @@ const double _ambientOcclusionDirectLightAffect = 0.25;
 
 /// A harmless fallback background colour, never actually seen: the camera
 /// always cover-fits the board to the viewport, so this never shows through.
-/// A dark warm brown, matching the wood floor and walls, in case it ever
-/// does.
-const Color _boardBackgroundColor = Color(0xFF2B1D12);
+/// A mid oak brown, close to the floor and walls, in case it ever does.
+const Color _boardBackgroundColor = Color(0xFF8A6A48);
 
 /// Renders the board and marble with flutter_scene, and drives the frame
 /// loop: reads the current tilt from [controller], steps [simulation], and
@@ -276,10 +286,20 @@ class _BoardSceneViewState extends State<BoardSceneView>
     // available once the engine's static resources are loaded.
     await Scene.initializeStaticResources();
 
-    final woodTexture = await Texture2D.fromAsset(_woodTextureAsset);
+    final wood = (
+      color: await Texture2D.fromAsset(_woodColorAsset),
+      normal: await Texture2D.fromAsset(
+        _woodNormalAsset,
+        content: TextureContent.normal,
+      ),
+      roughness: await Texture2D.fromAsset(
+        _woodRoughnessAsset,
+        content: TextureContent.data,
+      ),
+    );
     final marbleTexture = await Texture2D.fromAsset(_marbleTextureAsset);
 
-    _buildBoard(woodTexture);
+    _buildBoard(wood);
     _marbleNode = Node(
       mesh: Mesh(
         SphereGeometry(radius: kMarbleRadius),
@@ -338,35 +358,40 @@ class _BoardSceneViewState extends State<BoardSceneView>
   static const Color _cupColor = Color(0xFF141414);
   static const Color _exitCupColor = Colors.amber;
 
-  /// A wall side's tint, multiplied over the shared wood texture: noticeably
-  /// darker than the floor so walls read as distinct volumes rather than
-  /// blending into it.
-  static const double _wallSideTint = 0.55;
+  /// A wall top's tint, multiplied over the shared wood texture: a slightly
+  /// darker, warmer oak than the floor, as though cut from another board,
+  /// so walls read as distinct pieces without looking painted.
+  static final vm.Vector3 _wallTopTint = vm.Vector3(0.66, 0.5, 0.36);
 
-  /// A wall top's tint: lighter than [_wallSideTint] but still darker than
-  /// the floor, so each wall shows a visible top edge against its own sides.
-  static const double _wallTopTint = 0.72;
+  /// A wall side's tint: darker than [_wallTopTint], so each wall's top
+  /// stands out against its own sides.
+  static final vm.Vector3 _wallSideTint = vm.Vector3(0.42, 0.31, 0.22);
 
-  /// `doubleSided` since floor tiles, opening rings, and wall faces are
-  /// hand-built flat quads (see [_quadGeometry]); getting every face's
-  /// winding order exactly right for backface culling is unnecessary risk
-  /// for geometry this thin. [tint] multiplies the shared wood texture,
-  /// darkening it uniformly without shifting its hue.
+  /// `doubleSided` since the board's floor and wall faces are hand-built
+  /// flat polygons (see `wood_geometry.dart`); getting every face's winding
+  /// order exactly right for backface culling is unnecessary risk for
+  /// geometry this thin. [tint] multiplies the shared wood texture.
   static PhysicallyBasedMaterial _woodMaterial(
-    Texture2D texture, {
-    double tint = 1,
-  }) => PhysicallyBasedMaterial()
-    ..baseColorTexture = texture
-    ..baseColorFactor = vm.Vector4(tint, tint, tint, 1)
-    ..metallicFactor = 0
-    ..roughnessFactor = 0.75
-    ..doubleSided = true;
+    _WoodTextures textures, {
+    vm.Vector3? tint,
+  }) {
+    final color = tint ?? vm.Vector3.all(1);
+    return PhysicallyBasedMaterial()
+      ..baseColorTexture = textures.color
+      ..baseColorFactor = vm.Vector4(color.x, color.y, color.z, 1)
+      ..normalTexture = textures.normal
+      ..normalScale = _woodNormalScale
+      ..metallicRoughnessTexture = textures.roughness
+      ..metallicFactor = 0
+      ..roughnessFactor = _woodRoughnessFactor
+      ..doubleSided = true;
+  }
 
-  void _buildBoard(Texture2D woodTexture) {
+  void _buildBoard(_WoodTextures woodTextures) {
     final level = widget.level;
-    final wood = _woodMaterial(woodTexture);
-    final wallSideWood = _woodMaterial(woodTexture, tint: _wallSideTint);
-    final wallTopWood = _woodMaterial(woodTexture, tint: _wallTopTint);
+    final wood = _woodMaterial(woodTextures);
+    final wallSideWood = _woodMaterial(woodTextures, tint: _wallSideTint);
+    final wallTopWood = _woodMaterial(woodTextures, tint: _wallTopTint);
     final openings = {...level.holes, level.exit};
 
     for (var row = 0; row < level.height; row++) {
@@ -377,39 +402,29 @@ class _BoardSceneViewState extends State<BoardSceneView>
           width: level.width,
           height: level.height,
         );
-        if (openings.contains(point)) {
-          _boardRoot.add(
-            _floorOpeningRing(
-              center: center,
-              holeRadius: point == level.exit ? kExitRadius : kHoleRadius,
-              material: wood,
-            ),
-          );
-        } else {
-          _boardRoot.add(_floorTile(center: center, material: wood));
-        }
+        final geometry = openings.contains(point)
+            ? floorOpeningGeometry(
+                center: center,
+                innerRadius: point == level.exit ? kExitRadius : kHoleRadius,
+                sheet: _woodSheet,
+              )
+            : floorTileGeometry(center: center, sheet: _woodSheet);
+        _boardRoot.add(Node(mesh: Mesh(geometry, wood)));
       }
     }
 
-    for (final wall in level.walls) {
-      final placement = wallRunPlacement(
-        wall,
-        width: level.width,
-        height: level.height,
-      );
-      _boardRoot.add(
-        _worldUvBoxNode(
-          center: vm.Vector3(
-            placement.center.x,
-            kWallHeight / 2,
-            placement.center.z,
-          ),
-          halfExtents: vm.Vector3(placement.halfLength, kWallHeight / 2, 0.5),
-          topMaterial: wallTopWood,
-          sideMaterial: wallSideWood,
-        ),
-      );
-    }
+    final walls = wallGeometry(
+      wallStripsFor(level),
+      width: level.width,
+      height: level.height,
+      wallHeight: kWallHeight,
+      sheet: _woodSheet,
+    );
+    _boardRoot.add(
+      Node()
+        ..addComponent(MeshComponent(Mesh(walls.top, wallTopWood)))
+        ..addComponent(MeshComponent(Mesh(walls.sides, wallSideWood))),
+    );
 
     for (final hole in level.holes) {
       _boardRoot.add(
@@ -428,27 +443,6 @@ class _BoardSceneViewState extends State<BoardSceneView>
 
   static vm.Vector4 _colorToVector4(Color color) =>
       vm.Vector4(color.r, color.g, color.b, color.a);
-
-  /// A flat, world-UV-mapped quad for one non-opening floor cell.
-  Node _floorTile({
-    required vm.Vector3 center,
-    required PhysicallyBasedMaterial material,
-  }) => Node(mesh: Mesh(_worldUvQuad(center: center), material));
-
-  /// A flat quad covering a cell except for a round opening of [holeRadius]
-  /// at its center, so the hole or exit's cup below shows through a real
-  /// gap in the floor rather than the marble rolling over painted-on solid
-  /// ground.
-  Node _floorOpeningRing({
-    required vm.Vector3 center,
-    required double holeRadius,
-    required PhysicallyBasedMaterial material,
-  }) => Node(
-    mesh: Mesh(
-      _worldUvAnnulus(center: center, innerRadius: holeRadius),
-      material,
-    ),
-  );
 
   /// A cup recessed [_cupDepth] below the floor: an open-topped cylinder (a
   /// side wall plus a bottom cap) so the marble visibly drops into it
@@ -698,201 +692,9 @@ class _BoardSceneViewState extends State<BoardSceneView>
   }
 }
 
-/// Builds one flat 1x1 world-UV floor quad centered at [center], facing
-/// `+Y`. See [_quadGeometry].
-MeshGeometry _worldUvQuad({required vm.Vector3 center, double halfSize = 0.5}) {
-  return _quadGeometry(
-    p00: vm.Vector3(center.x - halfSize, center.y, center.z - halfSize),
-    u: vm.Vector3(halfSize * 2, 0, 0),
-    v: vm.Vector3(0, 0, halfSize * 2),
-    normal: vm.Vector3(0, 1, 0),
-    uvOf: (p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile,
-  );
-}
-
-/// Builds a flat quad in the [p00], [p00]+[u], [p00]+[v], [p00]+[u]+[v]
-/// plane, with per-vertex UVs from [uvOf] and a single flat [normal].
-///
-/// Winds its two triangles the same way `flutter_scene`'s own
-/// `buildPlaneArrays` does for a `+Y`-facing quad spanned by `u` (its local
-/// X) and `v` (its local Z): `(p00, p00+v, p00+u)` then
-/// `(p00+u, p00+v, p00+u+v)`. Callers of this private helper are expected to
-/// pick `u` and `v` so that `cross(v, u)` equals the intended outward
-/// [normal]; getting that wrong only affects backface culling, which every
-/// caller here sidesteps by rendering with a `doubleSided` material.
-MeshGeometry _quadGeometry({
-  required vm.Vector3 p00,
-  required vm.Vector3 u,
-  required vm.Vector3 v,
-  required vm.Vector3 normal,
-  required vm.Vector2 Function(vm.Vector3 worldPosition) uvOf,
-}) {
-  final p10 = p00 + u;
-  final p01 = p00 + v;
-  final p11 = p00 + u + v;
-
-  final positions = <double>[];
-  final normals = <double>[];
-  final uvs = <double>[];
-  for (final p in [p00, p10, p01, p11]) {
-    positions.addAll([p.x, p.y, p.z]);
-    normals.addAll([normal.x, normal.y, normal.z]);
-    final uv = uvOf(p);
-    uvs.addAll([uv.x, uv.y]);
-  }
-
-  return MeshGeometry.fromArrays(
-    positions: Float32List.fromList(positions),
-    normals: Float32List.fromList(normals),
-    texCoords: Float32List.fromList(uvs),
-    indices: const [0, 2, 1, 1, 2, 3],
-  );
-}
-
-/// Builds a node carrying one world-UV-mapped box face mesh per visible
-/// side (the four side faces and the top; the bottom is never seen), for a
-/// wall segment centered at [center] with the given [halfExtents].
-/// [topMaterial] shades the top face and [sideMaterial] the four sides, so a
-/// wall's top edge reads distinctly from its sides.
-Node _worldUvBoxNode({
-  required vm.Vector3 center,
-  required vm.Vector3 halfExtents,
-  required PhysicallyBasedMaterial topMaterial,
-  required PhysicallyBasedMaterial sideMaterial,
-}) {
-  final topGeometry = _boxTopGeometry(center: center, halfExtents: halfExtents);
-  final node = Node()
-    ..addComponent(MeshComponent(Mesh(topGeometry, topMaterial)));
-  for (final geometry in _boxSideGeometries(
-    center: center,
-    halfExtents: halfExtents,
-  )) {
-    node.addComponent(MeshComponent(Mesh(geometry, sideMaterial)));
-  }
-  return node;
-}
-
-/// The box's top face geometry, with world-UV texture coordinates projected
-/// onto its own plane so the wood grain reads continuously across a wall's
-/// length instead of stretching end-to-end.
-MeshGeometry _boxTopGeometry({
-  required vm.Vector3 center,
-  required vm.Vector3 halfExtents,
-}) {
-  final hx = halfExtents.x;
-  final hy = halfExtents.y;
-  final hz = halfExtents.z;
-  vm.Vector2 xz(vm.Vector3 p) => vm.Vector2(p.x, p.z) / _woodUvUnitsPerTile;
-
-  return _quadGeometry(
-    p00: vm.Vector3(center.x - hx, center.y + hy, center.z - hz),
-    u: vm.Vector3(2 * hx, 0, 0),
-    v: vm.Vector3(0, 0, 2 * hz),
-    normal: vm.Vector3(0, 1, 0),
-    uvOf: xz,
-  );
-}
-
-/// The box's four side face geometries, each with world-UV texture
-/// coordinates projected onto that face's own plane. See [_boxTopGeometry].
-Iterable<MeshGeometry> _boxSideGeometries({
-  required vm.Vector3 center,
-  required vm.Vector3 halfExtents,
-}) sync* {
-  final hx = halfExtents.x;
-  final hy = halfExtents.y;
-  final hz = halfExtents.z;
-
-  vm.Vector2 zy(vm.Vector3 p) => vm.Vector2(p.z, p.y) / _woodUvUnitsPerTile;
-  vm.Vector2 xy(vm.Vector3 p) => vm.Vector2(p.x, p.y) / _woodUvUnitsPerTile;
-
-  // +X.
-  yield _quadGeometry(
-    p00: vm.Vector3(center.x + hx, center.y - hy, center.z - hz),
-    u: vm.Vector3(0, 0, 2 * hz),
-    v: vm.Vector3(0, 2 * hy, 0),
-    normal: vm.Vector3(1, 0, 0),
-    uvOf: zy,
-  );
-  // -X.
-  yield _quadGeometry(
-    p00: vm.Vector3(center.x - hx, center.y - hy, center.z - hz),
-    u: vm.Vector3(0, 2 * hy, 0),
-    v: vm.Vector3(0, 0, 2 * hz),
-    normal: vm.Vector3(-1, 0, 0),
-    uvOf: zy,
-  );
-  // +Z.
-  yield _quadGeometry(
-    p00: vm.Vector3(center.x - hx, center.y - hy, center.z + hz),
-    u: vm.Vector3(0, 2 * hy, 0),
-    v: vm.Vector3(2 * hx, 0, 0),
-    normal: vm.Vector3(0, 0, 1),
-    uvOf: xy,
-  );
-  // -Z.
-  yield _quadGeometry(
-    p00: vm.Vector3(center.x - hx, center.y - hy, center.z - hz),
-    u: vm.Vector3(2 * hx, 0, 0),
-    v: vm.Vector3(0, 2 * hy, 0),
-    normal: vm.Vector3(0, 0, -1),
-    uvOf: xy,
-  );
-}
-
-/// Builds a flat, world-UV annulus centered at [center]: a round opening of
-/// [innerRadius] cut out of an otherwise square (of half-size [halfSize])
-/// floor cell, so a hole's or the exit's cup shows through a real gap in
-/// the floor instead of the marble rolling over a flat, painted-on circle.
-///
-/// [segments] divides the ring; the outer boundary follows the square cell
-/// edge at each segment's angle rather than a circle, so adjacent opening
-/// and non-opening tiles still meet edge-to-edge with no gap.
-MeshGeometry _worldUvAnnulus({
-  required vm.Vector3 center,
-  required double innerRadius,
-  double halfSize = 0.5,
-  int segments = 24,
-}) {
-  final positions = <double>[];
-  final normals = <double>[];
-  final uvs = <double>[];
-  final indices = <int>[];
-
-  for (var i = 0; i < segments; i++) {
-    final angle = 2 * math.pi * i / segments;
-    final cos = math.cos(angle);
-    final sin = math.sin(angle);
-    final outerT = halfSize / math.max(cos.abs(), sin.abs());
-
-    final innerX = center.x + cos * innerRadius;
-    final innerZ = center.z + sin * innerRadius;
-    final outerX = center.x + cos * outerT;
-    final outerZ = center.z + sin * outerT;
-
-    positions.addAll([innerX, center.y, innerZ, outerX, center.y, outerZ]);
-    normals.addAll([0, 1, 0, 0, 1, 0]);
-    uvs.addAll([
-      innerX / _woodUvUnitsPerTile,
-      innerZ / _woodUvUnitsPerTile,
-      outerX / _woodUvUnitsPerTile,
-      outerZ / _woodUvUnitsPerTile,
-    ]);
-  }
-
-  for (var i = 0; i < segments; i++) {
-    final inner0 = i * 2;
-    final outer0 = i * 2 + 1;
-    final next = (i + 1) % segments;
-    final inner1 = next * 2;
-    final outer1 = next * 2 + 1;
-    indices.addAll([inner0, outer0, inner1, inner1, outer0, outer1]);
-  }
-
-  return MeshGeometry.fromArrays(
-    positions: Float32List.fromList(positions),
-    normals: Float32List.fromList(normals),
-    texCoords: Float32List.fromList(uvs),
-    indices: indices,
-  );
-}
+/// The shared wood textures every board material samples.
+typedef _WoodTextures = ({
+  Texture2D color,
+  Texture2D normal,
+  Texture2D roughness,
+});
