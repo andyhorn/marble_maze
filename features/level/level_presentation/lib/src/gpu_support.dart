@@ -1,4 +1,5 @@
 import 'package:flutter_scene/scene.dart';
+import 'package:level_presentation/level_play/board/board_textures.dart';
 
 /// Probes whether Flutter GPU (and so Impeller) is available on this
 /// device, without ever throwing.
@@ -11,7 +12,12 @@ import 'package:flutter_scene/scene.dart';
 /// it a safe, front-loaded readiness probe for a startup check, so a
 /// caller can show an unsupported-device screen instead of crashing deeper
 /// into the render path.
+///
+/// When the GPU is available this also starts loading the board textures
+/// in the background, so entering a level doesn't wait on decoding them.
 Future<bool> isFlutterGpuAvailable() async {
   await Scene.initializeStaticResources();
-  return Scene.isReadyToRender;
+  final isAvailable = Scene.isReadyToRender;
+  if (isAvailable) BoardTextures.preload();
+  return isAvailable;
 }

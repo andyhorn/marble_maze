@@ -7,6 +7,7 @@ import 'package:flutter_scene/scene.dart';
 import 'package:level_domain/level_domain.dart';
 import 'package:level_presentation/level_play/animation/marble_exit_animation.dart';
 import 'package:level_presentation/level_play/animation/marble_sink_animation.dart';
+import 'package:level_presentation/level_play/board/board_textures.dart';
 import 'package:level_presentation/level_play/board/wall_strip.dart';
 import 'package:level_presentation/level_play/board/wood_geometry.dart';
 import 'package:level_presentation/level_play/camera/board_camera.dart';
@@ -36,22 +37,6 @@ const _hapticsDecider = HapticsDecider();
 /// `assets/hdr/ASSETS.md` for its source and licence.
 const _environmentAsset =
     'packages/level_presentation/assets/hdr/studio_small_03_1k.hdr';
-
-/// The oak textures used for the floor and walls: base colour, OpenGL
-/// convention normal map, and a greyscale roughness map (read from its green
-/// channel, as glTF's metallic-roughness slot expects). See
-/// `assets/textures/ASSETS.md` for their source and licence.
-const _woodColorAsset =
-    'packages/level_presentation/assets/textures/oak_veneer_01_diff_2k.jpg';
-const _woodNormalAsset =
-    'packages/level_presentation/assets/textures/oak_veneer_01_nor_gl_2k.jpg';
-const _woodRoughnessAsset =
-    'packages/level_presentation/assets/textures/oak_veneer_01_rough_1k.jpg';
-
-/// The generated marble base-colour swirl texture. See
-/// `assets/textures/ASSETS.md` for how it's built.
-const _marbleTextureAsset =
-    'packages/level_presentation/assets/textures/marble_swirl.png';
 
 /// How the floor and walls sample the shared wood texture.
 const _woodSheet = WoodSheet();
@@ -292,25 +277,14 @@ class _BoardSceneViewState extends State<BoardSceneView>
     // available once the engine's static resources are loaded.
     await Scene.initializeStaticResources();
 
-    final wood = (
-      color: await Texture2D.fromAsset(_woodColorAsset),
-      normal: await Texture2D.fromAsset(
-        _woodNormalAsset,
-        content: TextureContent.normal,
-      ),
-      roughness: await Texture2D.fromAsset(
-        _woodRoughnessAsset,
-        content: TextureContent.data,
-      ),
-    );
-    final marbleTexture = await Texture2D.fromAsset(_marbleTextureAsset);
+    final textures = await BoardTextures.load();
 
-    _buildBoard(wood);
+    _buildBoard(textures);
     _marbleNode = Node(
       mesh: Mesh(
         SphereGeometry(radius: kMarbleRadius),
         PhysicallyBasedMaterial()
-          ..baseColorTexture = marbleTexture
+          ..baseColorTexture = textures.marble
           ..metallicFactor = 0
           ..roughnessFactor = 0.35,
       ),
@@ -381,26 +355,26 @@ class _BoardSceneViewState extends State<BoardSceneView>
   /// order exactly right for backface culling is unnecessary risk for
   /// geometry this thin. [tint] multiplies the shared wood texture.
   static PhysicallyBasedMaterial _woodMaterial(
-    _WoodTextures textures, {
+    BoardTextures textures, {
     vm.Vector3? tint,
   }) {
     final color = tint ?? vm.Vector3.all(1);
     return PhysicallyBasedMaterial()
-      ..baseColorTexture = textures.color
+      ..baseColorTexture = textures.woodColor
       ..baseColorFactor = vm.Vector4(color.x, color.y, color.z, 1)
-      ..normalTexture = textures.normal
+      ..normalTexture = textures.woodNormal
       ..normalScale = _woodNormalScale
-      ..metallicRoughnessTexture = textures.roughness
+      ..metallicRoughnessTexture = textures.woodRoughness
       ..metallicFactor = 0
       ..roughnessFactor = _woodRoughnessFactor
       ..doubleSided = true;
   }
 
-  void _buildBoard(_WoodTextures woodTextures) {
+  void _buildBoard(BoardTextures textures) {
     final level = widget.level;
-    final wood = _woodMaterial(woodTextures);
-    final wallSideWood = _woodMaterial(woodTextures, tint: _wallSideTint);
-    final wallTopWood = _woodMaterial(woodTextures, tint: _wallTopTint);
+    final wood = _woodMaterial(textures);
+    final wallSideWood = _woodMaterial(textures, tint: _wallSideTint);
+    final wallTopWood = _woodMaterial(textures, tint: _wallTopTint);
     final openings = {...level.holes, level.exit};
 
     for (var row = 0; row < level.height; row++) {
@@ -700,10 +674,3 @@ class _BoardSceneViewState extends State<BoardSceneView>
     );
   }
 }
-
-/// The shared wood textures every board material samples.
-typedef _WoodTextures = ({
-  Texture2D color,
-  Texture2D normal,
-  Texture2D roughness,
-});
